@@ -541,8 +541,21 @@ function adminListHTML(list){
 }
 function aRefreshList(){const el=document.getElementById("aList");if(!el)return;const a=state.a;let list=itemsFor(a.univ.id,a.fac.id,a.niv,a.mat,a.tab).slice();if(a.sort==="recent")list.sort((x,y)=>(y.ts||0)-(x.ts||0));else if(a.sort==="az")list.sort((x,y)=>x.titre.localeCompare(y.titre));el.innerHTML=adminListHTML(list);}
 function updField(id,k,v){const c=state.contenus.find(x=>x.id===id);if(c)c[k]=v;}
-function delItem(id){state.contenus=state.contenus.filter(c=>c.id!==id);render();}
-
+async function delItem(id){
+  // --- NOUVEAU : Suppression sur Supabase ---
+  if(sb){
+    const c = state.contenus.find(x => x.id === id);
+    if(c && c.source === "upload") {
+      const fileName = c.id + (c.kind === "pdf" ? ".pdf" : ".png");
+      await sb.storage.from("sujets").remove([fileName]);
+    }
+    await sb.from("contenus").delete().eq("id", id);
+  }
+  // ------------------------------------------
+  
+  state.contenus=state.contenus.filter(c=>c.id!==id);
+  render();
+}
 function bindAdmin(){
   const dz=document.getElementById("dz"),fi=document.getElementById("fi");
   if(dz&&fi){dz.onclick=()=>fi.click();fi.onchange=()=>{if(fi.files.length)handleFiles([...fi.files]);fi.value="";};
