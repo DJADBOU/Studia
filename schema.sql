@@ -1,5 +1,6 @@
 -- ============================================================
 -- Studia — schéma de base (à exécuter dans Supabase → SQL Editor)
+-- Script idempotent : peut être ré-exécuté sans risque.
 -- ============================================================
 
 -- 1) Abonnés (rempli par le webhook Stripe, via la clé service_role)
@@ -12,7 +13,7 @@ create table if not exists subscribers (
   updated_at timestamptz default now()
 );
 alter table subscribers enable row level security;
--- chacun voit uniquement son propre abonnement ; les écritures se font côté serveur (service_role)
+drop policy if exists "voir_mon_abonnement" on subscribers;
 create policy "voir_mon_abonnement" on subscribers
   for select to authenticated using (user_id = auth.uid());
 
@@ -35,11 +36,11 @@ alter table contenus add column if not exists video_url text;
 alter table contenus add column if not exists description text;
 alter table contenus enable row level security;
 
--- le contenu gratuit est visible par tous
+drop policy if exists "contenus_gratuits_publics" on contenus;
 create policy "contenus_gratuits_publics" on contenus
   for select using (gratuit = true);
 
--- le reste n'est visible que par un abonné ACTIF (la vraie barrière, pas le floutage front)
+drop policy if exists "contenus_abonnes" on contenus;
 create policy "contenus_abonnes" on contenus
   for select to authenticated
   using (exists (
@@ -47,7 +48,7 @@ create policy "contenus_abonnes" on contenus
     where s.user_id = auth.uid() and s.status = 'active'
   ));
 
--- l'admin gère les contenus : à restreindre à ton compte (remplace l'email)
+drop policy if exists "contenus_admin_ecriture" on contenus;
 create policy "contenus_admin_ecriture" on contenus
   for all to authenticated
   using (auth.jwt() ->> 'email' = 'djad@studia.app')
@@ -63,9 +64,12 @@ create table if not exists matieres_hidden (
   primary key (univ, faculte, annee, matiere)
 );
 alter table matieres_hidden enable row level security;
--- tout le monde peut lire la liste (sert à filtrer côté client)
-create policy "matieres_hidden_public_read" on matieres_hidden for select using (true);
--- seul l'admin peut ajouter/supprimer
+
+drop policy if exists "matieres_hidden_public_read" on matieres_hidden;
+create policy "matieres_hidden_public_read" on matieres_hidden
+  for select using (true);
+
+drop policy if exists "matieres_hidden_admin_write" on matieres_hidden;
 create policy "matieres_hidden_admin_write" on matieres_hidden
   for all to authenticated
   using (auth.jwt() ->> 'email' = 'djad@studia.app')
@@ -80,21 +84,49 @@ create policy "matieres_hidden_admin_write" on matieres_hidden
 --                       - hero       : hero.jpg
 --                       - sections   : mission.jpg, cours.jpg, td.jpg, examen.jpg
 --                       - campus     : campus-uca.jpg, campus-amu.jpg, campus-p1.jpg, campus-tse.jpg
+--                       - fondateurs : jade.jpg, ellis.jpg
 --                    Le site charge ces fichiers depuis l'URL publique du bucket.
 --                    Tant qu'un fichier est absent, le site fallback élégamment
 --                    (badge à initiale pour les logos, gradient vert pour les photos).
 
--- Storage policies pour "assets" (à exécuter une fois le bucket créé)
--- Permet à n'importe qui de lire les fichiers (bucket public en lecture)
--- Et seulement l'admin de les uploader/remplacer.
-create policy if not exists "assets_public_read" on storage.objects
+-- Storage policies pour "assets" : tout le monde peut lire, seul l'admin écrit
+drop policy if exists "assets_public_read" on storage.objects;
+create policy "assets_public_read" on storage.objects
   for select using (bucket_id = 'assets');
-create policy if not exists "assets_admin_write" on storage.objects
+
+drop policy if exists "assets_admin_write" on storage.objects;
+create policy "assets_admin_write" on storage.objects
   for insert to authenticated
   with check (bucket_id = 'assets' and auth.jwt() ->> 'email' = 'djad@studia.app');
-create policy if not exists "assets_admin_update" on storage.objects
+
+drop policy if exists "assets_admin_update" on storage.objects;
+create policy "assets_admin_update" on storage.objects
   for update to authenticated
   using (bucket_id = 'assets' and auth.jwt() ->> 'email' = 'djad@studia.app');
-create policy if not exists "assets_admin_delete" on storage.objects
+
+drop policy if exists "assets_admin_delete" on storage.objects;
+create policy "assets_admin_delete" on storage.objects
   for delete to authenticated
   using (bucket_id = 'assets' and auth.jwt() ->> 'email' = 'djad@studia.app');
+
+-- Storage policies pour "sujets" : bucket privé, seul l'admin upload/lit
+-- (l'edge function "download" utilise la clé service_role qui bypass la RLS)
+drop policy if exists "sujets_admin_select" on storage.objects;
+create policy "sujets_admin_select" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'sujets' and auth.jwt() ->> 'email' = 'djad@studia.app');
+
+drop policy if exists "sujets_admin_write" on storage.objects;
+create policy "sujets_admin_write" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'sujets' and auth.jwt() ->> 'email' = 'djad@studia.app');
+
+drop policy if exists "sujets_admin_update" on storage.objects;
+create policy "sujets_admin_update" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'sujets' and auth.jwt() ->> 'email' = 'djad@studia.app');
+
+drop policy if exists "sujets_admin_delete" on storage.objects;
+create policy "sujets_admin_delete" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'sujets' and auth.jwt() ->> 'email' = 'djad@studia.app');
