@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Studia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
+:root{--bg:#FBFBFA;--surface:#FFFFFF;--border:#EAE9E6;--borderStrong:#DEDDD9;--ink:#1A1A18;--text:#37352F;--sub:#6F6E69;--muted:#9B9A94;--accent:#0F7A6B;--accentSoft:#E7F2EF;--amber:#9A6A18;--amberSoft:#F6EFDF;--sans:'Geist',-apple-system,BlinkMacSystemFont,sans-serif;--serif:'Instrument Serif',Georgia,serif}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+button{font-family:var(--sans);cursor:pointer}
+input,select{font-family:var(--sans)}
+a{color:inherit;text-decoration:none}
+.hidden{display:none!important}
+.wrap{max-width:1100px;margin:0 auto;padding:0 24px}
+.logo{width:26px;height:26px;border-radius:7px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:17px}
+.serif{font-family:var(--serif);font-weight:400;letter-spacing:-.3px}
+.pill{font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:6px;background:var(--accentSoft);color:var(--accent);white-space:nowrap}
+.tag{font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:6px;background:#F2F1EE;color:var(--sub);white-space:nowrap}
+.tag.amber{background:var(--amberSoft);color:var(--amber)}
+.btn{border:1px solid transparent;border-radius:8px;font-weight:500;font-size:14px;padding:9px 16px;display:inline-flex;align-items:center;gap:7px;justify-content:center;transition:opacity .15s}
+.btn:hover{opacity:.88}
+.btn-ink{background:var(--ink);color:#fff}.btn-accent{background:var(--accent);color:#fff}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--borderStrong)}
+.btn-sm{padding:6px 12px;font-size:13px}
+.btn-lg{padding:12px 22px;font-size:15px}
+.input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--borderStrong);background:var(--bg);font-size:14px;color:var(--ink);outline:none}
+.input:focus{border-color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px}
+.card-h{transition:border-color .15s,transform .15s;cursor:pointer}
+.card-h:hover{border-color:var(--borderStrong);transform:translateY(-1px)}
+.muted{color:var(--muted);font-size:12px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade{animation:fadeUp .45s ease both}
+.nav{position:sticky;top:0;z-index:30;background:rgba(251,251,250,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.nav-in{height:60px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.nav-links{display:flex;align-items:center;gap:4px}
+.nav-links .link{background:none;border:none;font-size:14px;padding:7px 12px;border-radius:7px;color:var(--sub)}
+.nav-links .link.on{color:var(--ink);font-weight:500}
+@media(max-width:820px){.nav-links .link{display:none}}
+.ctxbar{border-bottom:1px solid var(--border);background:var(--surface)}
+.ctxbar-in{display:flex;align-items:center;gap:8px;padding:10px 0;font-size:13px;color:var(--sub);flex-wrap:wrap}
+.crumb{cursor:pointer;padding:3px 9px;border-radius:6px;background:#F2F1EE;color:var(--sub)}
+.crumb:hover{color:var(--ink)}
+.seg{display:inline-flex;background:#F2F1EE;border-radius:10px;padding:4px;gap:2px;flex-wrap:wrap}
+.seg button{border:none;background:transparent;font-size:14px;font-weight:500;padding:8px 18px;border-radius:8px;color:var(--sub)}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.seg.sm button{font-size:12.5px;padding:6px 11px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px;flex-wrap:wrap}
+.tabs button{background:none;border:none;font-size:14.5px;padding:10px 14px;display:flex;align-items:center;gap:7px;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+.row{padding:16px;display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.ic{width:44px;height:44px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--accentSoft);color:var(--accent);font-size:18px}
+.ic.lock{background:#F2F1EE;color:var(--muted)}
+.grid{display:grid;gap:14px}
+.dz{border:1.5px dashed var(--borderStrong);border-radius:12px;padding:24px 16px;text-align:center;color:var(--sub);transition:all .15s;cursor:pointer}
+.dz:hover,.dz.drag{border-color:var(--accent);background:var(--accentSoft)}
+.dz strong{color:var(--ink)}
+.ctrl{margin-top:14px}
+.ctrl-row{display:flex;justify-content:space-between;font-size:13px;color:var(--sub);margin-bottom:6px}
+.ctrl-row b{color:var(--ink);font-weight:500}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.token{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--accent);background:var(--accentSoft);padding:3px 7px;border-radius:6px;word-break:break-all}
+.thumb{width:70px;height:70px;border-radius:9px;border:1px solid var(--border);background:#F2F1EE;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.qrmini{width:46px;height:46px;border:1px solid var(--border);border-radius:7px;padding:3px;background:#fff;flex-shrink:0}
+.qrmini img{width:100%;height:100%}
+.note{display:flex;gap:10px;background:var(--amberSoft);border:1px solid #EADFC4;border-radius:12px;padding:14px;font-size:13px;color:#6B5418;line-height:1.55}
+.trace-result{margin-top:12px;padding:13px;border-radius:10px;background:var(--accentSoft);font-size:13.5px;line-height:1.6}
+.trace-result.miss{background:#FBEDEC;color:#8A3C34}
+.modal-bg{position:fixed;inset:0;z-index:60;background:rgba(26,26,24,.45);display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;max-width:380px;width:100%;padding:28px}
+.sec{padding:60px 0;border-top:1px solid var(--border)}
+.photo{position:relative;overflow:hidden;background:linear-gradient(135deg,#0F7A6B,#0b3b34)}
+.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.hero-img{position:absolute;inset:0;z-index:0;overflow:hidden}
+.hero-img img{width:100%;height:100%;object-fit:cover}
+.hero-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(251,251,250,.35),rgba(251,251,250,.9) 72%,var(--bg))}
+.burger{display:none;background:none;border:1px solid var(--borderStrong);border-radius:8px;padding:7px 11px;font-size:16px}
+@media(max-width:820px){.nav-links{display:none}.burger{display:inline-flex}}
+.mobile-menu{border-top:1px solid var(--border)}
+.mobile-menu .wrap>button{display:block;width:100%;text-align:left;background:none;border:none;padding:12px 0;font-size:15px;color:var(--text);border-bottom:1px solid var(--border)}
+.auth-tab{flex:1;background:none;border:none;padding:10px;font-size:14px;font-weight:500;color:var(--sub);border-bottom:2px solid transparent;cursor:pointer}
+.auth-tab.on{color:var(--ink);border-bottom-color:var(--ink)}
+#qrfactory{position:fixed;left:-9999px;top:-9999px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modalRoot"></div>
+<div id="qrfactory"></div>
+<script>
+/* ===== CONFIG ===== */
+const ACCOUNT="admin", ADMIN_EMAIL="djad@studia.app";
+/* ===== À REMPLIR POUR PASSER EN PRODUCTION ===== */
+const CONFIG={
+  SUPABASE_URL:"https://aswkkhdeiedjlxydxzbn.supabase.co",        // ← https://xxxx.supabase.co
+  SUPABASE_ANON_KEY:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzd2traGRlaWVkamx4eWR4emJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2ODY5OTcsImV4cCI6MjA5NjI2Mjk5N30.w9zsZ2Z6Kh-yQiixNpdCm9wj1Eb-lHYBiWtw3yc-Fnk",   // ← clé "anon public" (jamais la clé secrète !)
+  STRIPE_LINK_MENSUEL:"", // ← Stripe Payment Link (abo mensuel)
+  STRIPE_LINK_SEMESTRE:"",// ← Stripe Payment Link (abo semestriel)
+  FUNCTIONS_URL:"https://aswkkhdeiedjlxydxzbn.supabase.co/functions/v1",       // ← Edge Functions Supabase : https://xxxx.supabase.co/functions/v1
+};
+const KW={uca:"campus,university",amu:"university,architecture",p1:"paris,building",tse:"campus,modern"};
+let sb=null;
+function initSupabase(){try{if(CONFIG.SUPABASE_URL&&CONFIG.SUPABASE_ANON_KEY&&window.supabase){sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY);}}catch(e){console.warn("Supabase init:",e.message);}}
+async function loadContenus(){if(!sb)return;try{const{data,error}=await sb.from("contenus").select("*");if(!error&&data&&data.length){state.contenus=data.map(r=>({...r,source:r.source||"seed"}));render();}}catch(e){console.warn("loadContenus:",e.message);}}
+async function restoreSession(){if(!sb)return;try{const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=data.user.email===ADMIN_EMAIL;state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;render();}}catch(e){}}
+function goCheckout(plan){const link=plan==="semestre"?CONFIG.STRIPE_LINK_SEMESTRE:CONFIG.STRIPE_LINK_MENSUEL;if(link){window.location.href=link;}else{state.modal=true;renderModal();}}
+async function authToken(){if(!sb)return null;try{const{data}=await sb.auth.getSession();return data&&data.session?data.session.access_token:null;}catch(e){return null;}}
+async function startCheckout(plan){
+  if(CONFIG.FUNCTIONS_URL&&sb&&state.user){
+    try{const t=await authToken();const res=await fetch(CONFIG.FUNCTIONS_URL+"/create-checkout",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+t},body:JSON.stringify({plan})});const j=await res.json();if(j&&j.url){window.location.href=j.url;return;}}catch(e){}
+  }
+  goCheckout(plan);
+}
+async function downloadProtected(id){
+  if(!(CONFIG.FUNCTIONS_URL&&sb&&state.user)){alert("Téléchargement protégé disponible une fois le backend connecté (voir le README).");return;}
+  try{const t=await authToken();const res=await fetch(CONFIG.FUNCTIONS_URL+"/download?id="+encodeURIComponent(id),{headers:{"Authorization":"Bearer "+t}});if(!res.ok){alert("Accès refusé : abonnement requis.");return;}const blob=await res.blob();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="studia-"+id;document.body.appendChild(a);a.click();a.remove();}catch(e){alert("Erreur : "+e.message);}
+}
+
+/* ===== DATA ===== */
+const UNIVS=[
+ {id:"uca",nom:"Université Côte d'Azur",ville:"Nice",actif:true,facultes:[
+   {id:"eg",nom:"Économie & Gestion",mat:{
+     L1:["Microéconomie","Macroéconomie","Mathématiques","Statistiques","Comptabilité générale","Introduction à la gestion"],
+     L2:["Microéconomie 2","Macroéconomie 2","Comptabilité de gestion","Statistiques inférentielles","Mathématiques financières","Droit des affaires"],
+     L3:["Microéconomie approfondie","Économétrie","Analyse financière","Théorie des jeux","Économie publique","Analyse de données"]}},
+   {id:"droit",nom:"Droit",mat:{
+     L1:["Introduction au droit","Droit civil","Droit constitutionnel","Histoire du droit"],
+     L2:["Droit des obligations","Droit administratif","Droit pénal","Droit des affaires"],
+     L3:["Contrats spéciaux","Droit du travail","Droit international","Procédure civile"]}},
+   {id:"maths",nom:"Mathématiques",mat:{
+     L1:["Analyse 1","Algèbre 1","Probabilités","Logique & ensembles"],
+     L2:["Analyse 2","Algèbre linéaire","Statistiques","Topologie"],
+     L3:["Analyse complexe","Algèbre 2","Probabilités avancées","Calcul différentiel"]}},
+ ]},
+ {id:"amu",nom:"Aix-Marseille Université",ville:"Aix-en-Provence",actif:false,facultes:[]},
+ {id:"p1",nom:"Paris 1 Panthéon-Sorbonne",ville:"Paris",actif:false,facultes:[]},
+ {id:"tse",nom:"Toulouse School of Economics",ville:"Toulouse",actif:false,facultes:[]},
+];
+const TYPES=["Cours","TD","Examen"];
+const TUTEURS=[["Léa M.","18"],["Karim B.","17"],["Yanis T.","16"],["Sofia R.","17"]];
+const kindLabel={Cours:"Cours",TD:"TD corrigé",Examen:"Examen corrigé"};
+const kindIcon={Cours:"📘",TD:"▶",Examen:"📝"};
+
+let _uid=0;
+function seedContenus(){
+  const out=[]; let t=0;
+  for(const u of UNIVS){ if(!u.actif)continue;
+    for(const f of u.facultes){
+      for(const annee of ["L1","L2","L3"]){
+        for(const mat of f.mat[annee]){
+          TYPES.forEach((type,k)=>{
+            const [tut,note]=TUTEURS[t++%TUTEURS.length];
+            const titres={Cours:`Cours : ${mat}`,TD:`TD corrigé : ${mat}`,Examen:`Examen corrigé : ${mat}`};
+            out.push({id:"s"+(_uid++),source:"seed",univ:u.id,faculte:f.id,annee,matiere:mat,type,
+              titre:titres[type],tuteur:tut,note,duree:(10+((t*3)%16))+" min",
+              gratuit:(annee==="L1"&&k===0&&f.id==="eg"&&(mat==="Microéconomie"||mat==="Macroéconomie")),
+              ts:Date.now()-(out.length*1000)});
+          });
+        }
+      }
+    }
+  }
+  const fl=out.find(c=>c.univ==="uca"&&c.faculte==="eg"&&c.annee==="L1"&&c.matiere==="Microéconomie"&&c.type==="TD");
+  if(fl){fl.titre="Maximisation de l'utilité sous contrainte";fl.gratuit=true;fl.flagship=true;}
+  return out;
+}
+
+const state={
+  view:"landing", univ:null, faculte:null, annee:"L1", matiere:null, tab:"cours", item:null,
+  subscribed:false, adminAuthed:false, modal:false, user:null, menu:false, authMode:"login",
+  opt:{mode:"coin",corner:"bottom-right",sizePct:8,opacity:.35},
+  a:{view:"univ",univ:null,fac:null,niv:"L1",mat:null,tab:"Cours",sort:"recent"},
+  contenus:seedContenus(),
+};
+
+/* ===== templates ===== */
+const CORR=["Énoncé (reformulé)","La méthode","Solution pas à pas","Pièges fréquents","Ce qu'attend le correcteur","Pour aller plus loin"];
+const COURS=["L'essentiel","Les notions clés","Définitions & formules à connaître","Les confusions fréquentes"];
+const flagship=["Un consommateur de revenu R, biens de prix p1 et p2, utilité U=x1·x2. Déterminer le panier optimal.","On maximise l'utilité sous contrainte budgétaire : Lagrangien, ou TMS = rapport des prix. On pose la contrainte AVANT de dériver.","1) Contrainte p1·x1+p2·x2=R. 2) Lagrangien. 3) Conditions du 1er ordre. 4) TMS=p1/p2. 5) x1*=R/2p1, x2*=R/2p2.","Oublier la condition du 2nd ordre. Confondre TMS et rapport des prix. Ne pas interpréter le résultat.","Une démarche ordonnée et SURTOUT l'interprétation économique. Le calcul juste sans interprétation = la moyenne.","Refais avec U=x1^a·x2^b — tu retrouveras la part du revenu allouée à chaque bien."];
+const corrTpl=t=>[`Reformulation claire de « ${t} », sans jargon.`,"L'angle d'attaque et le réflexe méthodologique avant tout calcul.","Résolution détaillée, étape par étape, comme sur la copie.","Les erreurs classiques qui coûtent des points.","Le barème et ce que le correcteur valorise.","Une variante pour vérifier la maîtrise."];
+const coursTpl=t=>[`Le cœur de « ${t} » résumé sans remplissage.`,"Les concepts incontournables, avec exemples concrets.","Définitions et formules à savoir par cœur.","Les points souvent compris de travers."];
+
+/* ===== derived ===== */
+const univById=id=>UNIVS.find(u=>u.id===id);
+const facById=(uid,fid)=>{const u=univById(uid);return u&&u.facultes.find(f=>f.id===fid);};
+const matieresFor=(uid,fid,annee)=>[...new Set(state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee).map(c=>c.matiere))];
+const countMat=(uid,fid,annee,m,type)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type).length;
+const itemsFor=(uid,fid,annee,m,type)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type);
+const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+
+/* ===== handlers (public) ===== */
+function nav(v){state.view=v;render();}
+function goProgramme(){ state.view = state.faculte?"programme":(state.univ?"facultes":"univs"); render(); }
+function selectUniv(id){const u=univById(id);if(!u||!u.actif)return;state.univ=u;state.faculte=null;state.view="facultes";render();}
+function selectFaculte(fid){const f=facById(state.univ.id,fid);if(!f)return;state.faculte=f;state.annee="L1";state.view="programme";render();}
+function pickAnnee(a){state.annee=a;render();}
+function openMatiere(idx){const m=matieresFor(state.univ.id,state.faculte.id,state.annee)[idx];if(m==null)return;state.matiere=m;state.tab="cours";state.view="matiere";render();}
+function setTab(t){state.tab=t;render();}
+function openItem(id){state.item=state.contenus.find(c=>c.id===id);state.view="detail";render();}
+function setModal(v){state.modal=v;renderModal();}
+function subscribe(){state.subscribed=true;state.modal=false;renderModal();render();}
+function setAuthMode(m){state.authMode=m;render();}
+function toggleMenu(){state.menu=!state.menu;render();}
+function loginAdmin(){state.user={email:ADMIN_EMAIL,role:"admin"};state.adminAuthed=true;state.a.view="univ";state.view="admin";state.menu=false;render();}
+function loginStudent(email){state.user={email,role:"student"};state.adminAuthed=false;state.view="univs";state.menu=false;render();}
+async function doAuth(){
+  const email=(document.getElementById("authEmail").value||"").trim();
+  const pass=(document.getElementById("authPass").value||"");
+  const err=document.getElementById("authErr");
+  if(!email||!pass){if(err)err.textContent="Renseigne ton email et ton mot de passe.";return;}
+  if(sb){
+    try{
+      const {data,error}=await (state.authMode==="signup"?sb.auth.signUp({email,password:pass}):sb.auth.signInWithPassword({email,password:pass}));
+      if(error){if(err)err.textContent=error.message;return;}
+      const isAdmin=email===ADMIN_EMAIL;state.user={email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;state.view=isAdmin?"admin":"univs";state.menu=false;render();return;
+    }catch(e){if(err)err.textContent=e.message;return;}
+  }
+  loginStudent(email); // mode démo (sans Supabase configuré)
+}
+async function googleAuth(){if(sb){try{await sb.auth.signInWithOAuth({provider:"google"});}catch(e){}}else{loginStudent("etudiant@exemple.fr");}}
+function logout(){if(sb){try{sb.auth.signOut();}catch(e){}}state.user=null;state.adminAuthed=false;state.menu=false;state.view="landing";render();}
+
+/* ===== RENDER ===== */
+function render(){
+  if(typeof scanStream!=="undefined"&&scanStream)stopScan();
+  const app=document.getElementById("app");
+  if(state.view==="landing"){app.innerHTML=Landing();window.scrollTo(0,0);return;}
+  if(state.view==="login"){app.innerHTML=Nav()+LoginView()+Footer();window.scrollTo(0,0);return;}
+  let h=Nav();
+  const v=state.view;
+  if(v==="univs")h+=UnivsView();
+  else if(v==="facultes")h+=FacultesView();
+  else if(v==="programme")h+=Ctx()+Programme();
+  else if(v==="matiere")h+=Ctx()+MatiereView();
+  else if(v==="detail")h+=Ctx()+Detail();
+  else if(v==="tarifs")h+=Tarifs();
+  else if(v==="tuteur")h+=Tuteur();
+  else if(v==="admin")h+=AdminConsole();
+  h+=Footer();
+  app.innerHTML=h;
+  if(v==="admin"&&state.a.view==="manage")bindAdmin();
+  window.scrollTo(0,0);
+}
+
+/* ===== Landing ===== */
+function Landing(){
+  return `<div class="fade">${Nav()}
+  <div class="hero" style="position:relative">
+    <div class="hero-img"><img src="https://loremflickr.com/1400/760/university,library,study?lock=7" onerror="this.remove()"/></div>
+    <div class="wrap" style="position:relative;z-index:1;padding:88px 0 64px;max-width:760px">
+      <span class="pill">Par les étudiants, pour les étudiants</span>
+      <h1 class="serif" style="font-size:clamp(40px,6.5vw,68px);line-height:1.04;color:var(--ink);margin:20px 0 18px">Comprendre, s'entraîner, réussir.</h1>
+      <p style="font-size:20px;line-height:1.55;color:var(--sub);margin:0 0 30px;max-width:600px">Cours, TD et examens corrigés — expliqués en vidéo par les majors de ta promo. Pour que chaque étudiant ait vraiment les moyens de réussir sa licence.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn btn-ink btn-lg" onclick="nav('univs')">Choisir ma fac →</button><button class="btn btn-ghost btn-lg" onclick="nav('tuteur')">Devenir tuteur</button></div>
+    </div>
+  </div>
+  <div class="wrap">
+    <section class="sec" style="border:none;padding-top:24px">
+      <h2 class="serif" style="font-size:32px;color:var(--ink);margin:0 0 6px">Les facs déjà sur Studia</h2>
+      <p class="muted" style="margin:0 0 22px">On s'étend campus par campus.</p>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
+        ${UNIVS.map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.6"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
+          <div class="photo" style="aspect-ratio:16/10"><img loading="lazy" src="https://loremflickr.com/600/380/${KW[u.id]||"university,campus"}?lock=${i+2}" onerror="this.remove()"/></div>
+          <div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:600;color:var(--ink);font-size:15px">${u.nom}</div>${u.actif?'<span class="pill">Live</span>':'<span class="tag">Bientôt</span>'}</div><div class="muted" style="margin-top:3px">${u.ville}</div></div>
+        </div>`).join("")}
+      </div>
+    </section>
+    <section class="sec">
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px;align-items:center;border:none">
+        <div><h2 class="serif" style="font-size:34px;color:var(--ink);margin:0 0 14px">Notre mission</h2><p style="font-size:16px;color:var(--sub);line-height:1.65;margin:0">Trop d'étudiants décrochent faute d'explications claires, pas faute de travail. On remet les meilleurs étudiants au service des autres : ceux qui ont eu les meilleures notes expliquent la méthode, les pièges, et ce que le correcteur attend vraiment. Le savoir circule, tout le monde progresse.</p></div>
+        <div class="photo" style="aspect-ratio:4/3;border-radius:14px"><img loading="lazy" src="https://loremflickr.com/640/480/students,study,group?lock=21" onerror="this.remove()"/></div>
+      </div>
+    </section>
+    <section class="sec">
+      <h2 class="serif" style="font-size:34px;color:var(--ink);margin:0 0 28px">Ce que tu trouveras</h2>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+        ${[["lecture,classroom","Cours","Les notions essentielles résumées et filmées, sans remplissage."],["notebook,writing","TD corrigés","Chaque TD repris en vidéo, étape par étape, avec les pièges signalés."],["exam,paper","Examens corrigés","Les sujets d'examen corrigés pour t'entraîner en conditions réelles."]].map(([kw,t,d],i)=>`<div class="card" style="overflow:hidden"><div class="photo" style="aspect-ratio:16/9"><img loading="lazy" src="https://loremflickr.com/500/280/${kw}?lock=${i+31}" onerror="this.remove()"/></div><div style="padding:20px"><h3 style="font-size:18px;color:var(--ink);font-weight:600;margin:0 0 8px">${t}</h3><p style="font-size:14px;color:var(--sub);line-height:1.6;margin:0">${d}</p></div></div>`).join("")}
+      </div>
+    </section>
+    <section class="sec">
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:40px;border:none">
+        <div><h2 class="serif" style="font-size:34px;color:var(--ink);margin:0 0 14px">Pour qui ?</h2></div>
+        <div>${["L'étudiant qui veut comprendre, pas seulement réviser la veille.","Celui qui a décroché en cours d'année et veut se remettre à flot.","Celui qui vise la mention et veut la méthode des meilleurs.","Le major qui veut transmettre, gagner un peu d'argent et muscler son CV."].map(s=>`<div style="display:flex;gap:10px;font-size:15px;color:var(--text);line-height:1.5;margin-bottom:14px"><span style="color:var(--accent)">✓</span>${s}</div>`).join("")}</div>
+      </div>
+    </section>
+    <section class="sec" style="border:none">
+      <div class="card" style="background:var(--ink);border:none;padding:52px 32px;text-align:center"><h2 class="serif" style="font-size:38px;color:#fff;margin:0 0 10px">Trouve ta fac et commence.</h2><p style="font-size:16px;color:rgba(255,255,255,.7);margin:0 0 26px">Université, faculté, niveau — et accède à tout le programme.</p><button class="btn btn-accent btn-lg" onclick="nav('univs')">Choisir ma fac →</button></div>
+    </section>
+  </div>
+  ${Footer()}</div>`;
+}
+
+/* ===== Nav (post-landing) ===== */
+function navRight(){
+  let r="";
+  if(state.subscribed)r+='<span class="pill" style="margin-left:6px">✓ Abonné</span>';
+  else r+='<button class="btn btn-ink btn-sm" style="margin-left:6px" onclick="setModal(true)">S\'abonner</button>';
+  if(state.user){if(state.user.role==="admin")r=`<button class="link ${state.view==="admin"?"on":""}" onclick="nav('admin')">Console</button>`+r;r+='<button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="logout()">Déconnexion</button>';}
+  else r+='<button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="nav(\'login\')">Connexion</button>';
+  return r;
+}
+function MobileMenu(){return `<div class="mobile-menu"><div class="wrap" style="padding-bottom:8px">
+  <button onclick="goProgramme()">Programme</button><button onclick="nav('tarifs')">Tarifs</button><button onclick="nav('tuteur')">Devenir tuteur</button>
+  ${state.user?(state.user.role==="admin"?`<button onclick="nav('admin')">Console</button>`:"")+`<button onclick="logout()">Déconnexion</button>`:`<button onclick="nav('login')">Connexion</button>`}
+  ${state.subscribed?"":`<button onclick="setModal(true)">S'abonner</button>`}
+</div></div>`;}
+function Nav(){
+  return `<div class="nav"><div class="wrap nav-in">
+    <div onclick="nav('landing')" style="display:flex;align-items:center;gap:8px;cursor:pointer"><div class="logo">S</div><span style="font-weight:600;font-size:17px;color:var(--ink)">Studia</span></div>
+    <div class="nav-links">
+      <button class="link ${["univs","facultes","programme","matiere","detail"].includes(state.view)?"on":""}" onclick="goProgramme()">Programme</button>
+      <button class="link ${state.view==="tarifs"?"on":""}" onclick="nav('tarifs')">Tarifs</button>
+      <button class="link ${state.view==="tuteur"?"on":""}" onclick="nav('tuteur')">Devenir tuteur</button>
+      ${navRight()}
+    </div>
+    <button class="burger" onclick="toggleMenu()">☰</button>
+  </div>${state.menu?MobileMenu():""}</div>`;
+}
+function Ctx(){
+  if(!state.univ)return "";
+  return `<div class="ctxbar"><div class="wrap ctxbar-in">
+    <span class="crumb" onclick="nav('univs')">${state.univ.ville}</span><span>▸</span>
+    <span class="crumb" onclick="nav('facultes')">${state.faculte?state.faculte.nom:"Faculté"}</span>
+    ${state.faculte?`<span>▸</span><span class="crumb" onclick="nav('programme')">${state.annee}</span>`:""}
+    ${state.matiere&&(state.view==="matiere"||state.view==="detail")?`<span>▸</span><span class="crumb" onclick="nav('matiere')">${state.matiere}</span>`:""}
+  </div></div>`;
+}
+
+/* ===== Univs ===== */
+function UnivsView(){
+  return `<div class="wrap fade" style="padding:54px 0 0">
+    <h1 class="serif" style="font-size:42px;color:var(--ink);margin:0 0 8px">Choisis ton université</h1>
+    <p style="font-size:15px;color:var(--sub);margin:0 0 30px">Studia s'étend fac par fac. Sélectionne la tienne.</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+      ${UNIVS.map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.55"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
+        <div class="photo" style="aspect-ratio:16/9"><img loading="lazy" src="https://loremflickr.com/600/340/${KW[u.id]||"university,campus"}?lock=${i+2}" onerror="this.remove()"/></div>
+        <div style="padding:18px"><div style="display:flex;justify-content:space-between;align-items:center"><div class="logo" style="background:${u.actif?"var(--ink)":"#D9D8D4"}">${u.nom[0]}</div>${u.actif?'<span class="pill">Disponible</span>':'<span class="tag">Bientôt</span>'}</div><div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.3;margin-top:12px">${u.nom}</div><div style="font-size:13px;color:var(--sub);margin-top:3px">${u.ville}${u.actif?` · ${u.facultes.length} facultés`:""}</div></div>
+      </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+/* ===== Facultes ===== */
+function FacultesView(){
+  const u=state.univ;
+  return `<div class="wrap fade" style="padding:32px 0 0">
+    <button class="btn btn-ghost btn-sm" style="border:none;padding:0;color:var(--sub);margin-bottom:16px" onclick="nav('univs')">← Universités</button>
+    <h1 class="serif" style="font-size:40px;color:var(--ink);margin:0 0 6px">${u.nom}</h1>
+    <p style="font-size:15px;color:var(--sub);margin:0 0 28px">Choisis ta faculté.</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+      ${u.facultes.map(f=>`<div class="card card-h" style="padding:24px" onclick="selectFaculte('${f.id}')">
+        <div style="display:flex;justify-content:space-between;align-items:start"><h3 style="font-size:18px;color:var(--ink);font-weight:600;margin:0 0 6px">${f.nom}</h3><span style="color:var(--muted)">›</span></div>
+        <div style="font-size:13px;color:var(--sub)">L1 · L2 · L3 · ${[...new Set([].concat(...Object.values(f.mat)))].length} matières</div>
+      </div>`).join("")}
+    </div>
+  </div>`;
+}
+/* ===== Programme (niveau + matières) ===== */
+function Programme(){
+  const a=state.annee, uid=state.univ.id, fid=state.faculte.id, mats=matieresFor(uid,fid,a);
+  return `<div class="wrap fade" style="padding:36px 0 0">
+    <h1 class="serif" style="font-size:40px;color:var(--ink);margin:0 0 6px">${state.faculte.nom}</h1>
+    <p style="font-size:15px;color:var(--sub);margin:0 0 24px">Choisis ton niveau, puis ta matière.</p>
+    <div class="seg" style="margin-bottom:28px">${["L1","L2","L3"].map(y=>`<button class="${a===y?"on":""}" onclick="pickAnnee('${y}')">${y}</button>`).join("")}</div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">
+      ${mats.map((m,i)=>`<div class="card card-h" style="padding:20px" onclick="openMatiere(${i})">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:14px"><h3 style="font-size:17px;color:var(--ink);font-weight:600;margin:0;max-width:200px">${m}</h3><span style="color:var(--muted)">›</span></div>
+        <div style="display:flex;gap:14px;font-size:13px;color:var(--sub)"><span>${countMat(uid,fid,a,m,"Cours")} cours</span><span>${countMat(uid,fid,a,m,"TD")} TD</span><span>${countMat(uid,fid,a,m,"Examen")} exam.</span></div>
+      </div>`).join("")}
+    </div>
+  </div>`;
+}
+/* ===== Matiere ===== */
+function MatiereView(){
+  const {annee,matiere,tab}=state, uid=state.univ.id, fid=state.faculte.id;
+  const map={cours:"Cours",td:"TD",examens:"Examen"};
+  const items=itemsFor(uid,fid,annee,matiere,map[tab]);
+  return `<div class="wrap fade" style="padding:30px 0 0">
+    <button class="btn btn-ghost btn-sm" style="border:none;padding:0;color:var(--sub);margin-bottom:16px" onclick="nav('programme')">← ${state.faculte.nom} · ${annee}</button>
+    <h1 class="serif" style="font-size:38px;color:var(--ink);margin:0 0 20px">${matiere}</h1>
+    <div class="tabs">${[["cours","Cours","Cours"],["td","TD corrigés","TD"],["examens","Examens corrigés","Examen"]].map(([id,lbl,ty])=>`<button class="${tab===id?"on":""}" onclick="setTab('${id}')">${lbl} <span style="color:var(--muted);font-weight:400">${countMat(uid,fid,annee,matiere,ty)}</span></button>`).join("")}</div>
+    <div style="max-width:760px">${items.length?items.map(it=>{
+      const locked=!it.gratuit&&!state.subscribed;
+      return `<div class="card card-h row" onclick="openItem('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":kindIcon[it.type]}</div>
+        <div style="flex:1;min-width:0"><div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span class="tag">${kindLabel[it.type]}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}${it.source==="upload"?'<span class="tag amber">Nouveau</span>':""}</div>
+        <div style="font-size:15px;color:var(--ink);font-weight:500;margin-bottom:3px">${it.titre}</div><div class="muted">★ ${it.tuteur} · ${it.note}/20${it.duree?" · "+it.duree:""}</div></div><span style="color:var(--muted)">›</span></div>`;
+    }).join(""):`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucun contenu ici pour l'instant.</div>`}</div>
+  </div>`;
+}
+/* ===== Detail ===== */
+function Detail(){
+  const it=state.item, unlocked=it.gratuit||state.subscribed, isCours=it.type==="Cours", isUpload=it.source==="upload";
+  const labels=isCours?COURS:CORR;
+  const sections=isUpload?null:(it.flagship?flagship:(isCours?coursTpl(it.titre):corrTpl(it.titre)));
+  const vlabel=isCours?"Cours vidéo":"Correction vidéo";
+  let media;
+  if(isUpload){
+    media=`<div class="card" style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;overflow:hidden;background:${it.thumb?"#111":"#F2F1EE"}">${unlocked?(it.thumb?`<img src="${it.thumb}" style="max-width:100%;max-height:100%;object-fit:contain"/>`:`<div style="text-align:center;color:var(--sub)"><div style="font-size:30px">📄</div>Document PDF</div>`):`<div style="text-align:center;color:#fff"><div style="font-size:24px;margin-bottom:10px">🔒</div><div style="margin-bottom:14px">Sujet réservé aux abonnés</div><button class="btn btn-accent" onclick="setModal(true)">S'abonner</button></div>`}</div>`;
+  }else{
+    media=`<div style="aspect-ratio:16/9;border-radius:14px;border:1px solid var(--border);background:#111;display:flex;align-items:center;justify-content:center;color:#fff">${unlocked?`<div style="text-align:center"><div style="font-size:30px;opacity:.8">▶</div><div class="muted" style="color:rgba(255,255,255,.7)">${vlabel} · ${it.duree}</div></div>`:`<div style="text-align:center;padding:20px"><div style="font-size:24px;margin-bottom:10px">🔒</div><div style="margin-bottom:14px">${vlabel} réservée aux abonnés</div><button class="btn btn-accent" onclick="setModal(true)">S'abonner pour débloquer</button></div>`}</div>`;
+  }
+  return `<div class="wrap fade" style="padding:30px 0 0;max-width:760px">
+    <button class="btn btn-ghost btn-sm" style="border:none;padding:0;color:var(--sub);margin-bottom:18px" onclick="nav('matiere')">← Retour à la matière</button>
+    <div style="display:flex;gap:8px;margin-bottom:12px"><span class="tag">${kindLabel[it.type]}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}</div>
+    <h1 class="serif" style="font-size:34px;color:var(--ink);margin:0 0 10px;line-height:1.1">${it.titre}</h1>
+    <div class="muted" style="margin-bottom:24px">🎓 ${it.tuteur} · ${it.note!=="—"?"major à "+it.note+"/20":"contenu ajouté"}${it.duree?" · "+it.duree:""}</div>
+    ${media}${state.subscribed&&CONFIG.FUNCTIONS_URL?`<button class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="downloadProtected('${it.id}')">⬇ Télécharger (tatoué à ton compte)</button>`:""}
+    <div style="position:relative;margin-top:28px">${isUpload?`<div class="card" style="padding:22px;color:var(--sub);font-size:15px;line-height:1.6">Ce sujet vient d'être ajouté.${unlocked&&it.outUrl?` <a class="token" href="${it.outUrl}" download="${it.outName}">Télécharger</a>`:""}<br/>La correction vidéo et la méthode seront publiées prochainement.</div>`:sections.map((b,i)=>{const hide=!unlocked&&i>=2;return `<div style="margin-bottom:24px"><div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><span class="serif" style="font-size:18px;color:var(--muted)">${i+1}</span><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0">${labels[i]}</h3>${!isCours&&i===3?'<span class="tag amber">le + utile</span>':""}</div><p style="font-size:15px;color:var(--text);line-height:1.65;margin:0;padding-left:28px;${hide?"filter:blur(5px);user-select:none":""}">${b}</p></div>`;}).join("")}${!isUpload&&!unlocked?`<div style="position:absolute;left:0;right:0;bottom:0;height:200px;background:linear-gradient(to bottom,rgba(251,251,250,0),var(--bg) 78%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:14px"><div style="text-align:center"><div style="font-size:14px;color:var(--sub);margin-bottom:12px">${isCours?"Cours complet réservé aux abonnés":"Méthode, pièges et barème réservés aux abonnés"}</div><button class="btn btn-accent" onclick="setModal(true)">Débloquer</button></div></div>`:""}</div>
+  </div>`;
+}
+/* ===== Tarifs / Tuteur ===== */
+function Tarifs(){
+  const plans=[{nom:"Découverte",prix:"0",per:"",desc:"Pour tester",feats:["2 contenus gratuits","Aperçu des méthodes","Accès au programme"],cta:"C'est parti",v:"ghost",plan:"free"},{nom:"Pass semestriel",prix:"39",per:"/ semestre",desc:"Calé sur le rythme des partiels",feats:["Accès illimité tout le semestre","Cours + TD + examens corrigés","QCM & partiels blancs","Lives de révision"],cta:"Choisir le semestre",v:"accent",plan:"semestre",reco:true},{nom:"Mensuel",prix:"9",per:"/ mois",desc:"Flexible, sans engagement",feats:["Accès illimité","Tous les contenus corrigés","QCM & partiels blancs","Résiliable à tout moment"],cta:"Prendre au mois",v:"ghost",plan:"mensuel"}];
+  return `<div class="wrap fade" style="padding:54px 0 0;text-align:center"><h1 class="serif" style="font-size:44px;color:var(--ink);margin:0 0 10px">Tarifs</h1><p style="font-size:16px;color:var(--sub);margin:0 auto 42px;max-width:480px">Le pass semestriel suit le vrai rythme de l'année : couvert pour décembre ET pour mai.</p><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;max-width:920px;margin:0 auto;text-align:left">${plans.map(p=>`<div class="card" style="padding:26px;position:relative;${p.reco?"border:1.5px solid var(--accent)":""}">${p.reco?'<div style="position:absolute;top:-11px;left:26px"><span class="pill">Recommandé</span></div>':""}<div style="font-weight:600;color:var(--ink)">${p.nom}</div><div class="muted" style="margin:2px 0 16px;min-height:30px">${p.desc}</div><div style="display:flex;align-items:baseline;gap:4px;margin-bottom:18px"><span class="serif" style="font-size:44px;color:var(--ink)">${p.prix}€</span><span class="muted">${p.per}</span></div><button class="btn btn-${p.v}" style="width:100%;margin-bottom:18px" onclick="${p.plan==="free"?"nav('univs')":`startCheckout('${p.plan}')`}">${p.cta}</button>${p.feats.map(f=>`<div style="display:flex;gap:9px;font-size:14px;color:var(--text);margin-bottom:10px"><span style="color:var(--accent)">✓</span>${f}</div>`).join("")}</div>`).join("")}</div></div>`;
+}
+
+function Tuteur(){
+  const cr=[["Note ≥ 16/20","Tu dois avoir cartonné dans la matière."],["Correction-test validée","Relue par l'équipe avant publication."],["Contenu 100 % original","Tes propres cours et corrigés — jamais ceux d'un prof."]];
+  return `<div class="wrap fade" style="padding:54px 0 0"><div style="max-width:640px"><span class="pill">Rejoins l'équipe</span><h1 class="serif" style="font-size:46px;color:var(--ink);margin:18px 0 16px;line-height:1.05">Aide ta promo. Gagne de l'argent. Muscle ton CV.</h1><p style="font-size:17px;color:var(--sub);line-height:1.6;margin:0 0 32px">Tu as excellé ? Transmets ta méthode. Rémunéré sur chaque contenu publié, et une vraie ligne d'expérience.</p></div><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:32px">${cr.map(([t,d],i)=>`<div class="card" style="padding:22px"><div class="serif" style="font-size:24px;color:var(--accent);margin-bottom:8px">0${i+1}</div><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0 0 6px">${t}</h3><p style="font-size:14px;color:var(--sub);line-height:1.55;margin:0">${d}</p></div>`).join("")}</div><div class="note" style="max-width:720px">⚠️ <div><b>Charte tuteur.</b> Chaque tuteur certifie que son contenu est original et ne reproduit aucun support de cours d'un enseignant. Règle non négociable — et notre protection.</div></div></div>`;
+}
+/* ===== Login ===== */
+function LoginView(){
+  const signup=state.authMode==="signup";
+  return `<div class="wrap fade" style="max-width:400px;padding:60px 0"><div class="card" style="padding:32px">
+    <div class="logo" style="margin-bottom:16px">S</div>
+    <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:20px">
+      <button class="auth-tab ${!signup?"on":""}" onclick="setAuthMode('login')">Connexion</button>
+      <button class="auth-tab ${signup?"on":""}" onclick="setAuthMode('signup')">Inscription</button>
+    </div>
+    ${signup?`<div style="margin-bottom:12px"><input class="input" id="authName" placeholder="Nom complet"/></div>`:""}
+    <div style="margin-bottom:12px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username"/></div>
+    <div style="margin-bottom:12px"><input class="input" id="authPass" type="password" placeholder="Mot de passe" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()"/></div>
+    <button class="btn btn-ink" style="width:100%" onclick="doAuth()">${signup?"Créer mon compte":"Se connecter"}</button>
+    <div id="authErr" style="color:#B4453A;font-size:13px;min-height:18px;margin-top:8px"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span class="muted">ou</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
+    <button class="btn btn-ghost" style="width:100%" onclick="googleAuth()">Continuer avec Google</button>
+    <p class="muted" style="margin-top:16px">Espace gestion (admin) : connecte-toi avec <b>djad</b> / <b>studia-admin</b>.</p>
+  </div></div>`;
+}
+/* ===== Footer ===== */
+function Footer(){
+  return `<div style="border-top:1px solid var(--border);margin-top:80px;background:var(--surface)"><div class="wrap" style="padding:36px 0;display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between"><div style="max-width:340px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><div class="logo" style="width:22px;height:22px;font-size:14px">S</div><span style="font-weight:600;color:var(--ink)">Studia</span></div><p class="muted" style="line-height:1.6;margin:0">Plateforme indépendante d'entraide entre étudiants. Non affiliée aux établissements. Contenus originaux produits par nos tuteurs.</p></div><div style="font-size:13px;color:var(--sub);line-height:2"><div style="font-weight:500;color:var(--text);margin-bottom:4px">Liens</div><div>Programme</div><div>Tarifs</div><div>Devenir tuteur</div><div>CGU · Confidentialité</div></div></div></div>`;
+}
+
+/* ===== ADMIN CONSOLE (drill-down) ===== */
+function aSet(k,v){state.a[k]=v;render();}
+function aGo(view){state.a.view=view;render();}
+function aPickUniv(id){const u=univById(id);if(!u||!u.actif)return;state.a.univ=u;state.a.view="fac";render();}
+function aPickFac(fid){state.a.fac=facById(state.a.univ.id,fid);state.a.view="niv";render();}
+function aPickNiv(n){state.a.niv=n;state.a.view="mat";render();}
+function aPickMat(idx){const m=matieresFor(state.a.univ.id,state.a.fac.id,state.a.niv)[idx];if(m==null)return;state.a.mat=m;state.a.tab="Cours";state.a.view="manage";render();}
+function aCrumb(){
+  const a=state.a, parts=[["Console",`aGo('univ')`]];
+  if(a.univ)parts.push([a.univ.ville,`aGo('fac')`]);
+  if(a.fac)parts.push([a.fac.nom,`aGo('niv')`]);
+  if(a.view==="manage"||a.view==="mat"){if(a.fac)parts.push([a.niv,`aGo('mat')`]);}
+  if(a.view==="manage"&&a.mat)parts.push([a.mat,null]);
+  return `<div class="ctxbar-in" style="padding:0 0 18px">${parts.map(([t,h],i)=>`${i>0?'<span>▸</span>':''}<span class="${h?'crumb':''}" ${h?`onclick="${h}"`:''} style="${h?'':'color:var(--ink);font-weight:500'}">${t}</span>`).join("")}</div>`;
+}
+function AdminConsole(){
+  const a=state.a;
+  let body;
+  if(a.view==="univ"){
+    body=`<h2 class="serif" style="font-size:30px;color:var(--ink);margin:0 0 6px">Console admin</h2><p class="muted" style="margin:0 0 24px">Descends dans la structure pour gérer un catalogue précis. Tout est rangé par université ▸ faculté ▸ niveau ▸ matière.</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${UNIVS.map(u=>`<div class="card ${u.actif?"card-h":""}" style="padding:22px;${u.actif?"":"opacity:.55"}" ${u.actif?`onclick="aPickUniv('${u.id}')"`:""}><div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px"><div class="logo" style="background:${u.actif?"var(--ink)":"#D9D8D4"}">${u.nom[0]}</div>${u.actif?'<span class="pill">Disponible</span>':'<span class="tag">Bientôt</span>'}</div><div style="font-weight:600;color:var(--ink);font-size:15px">${u.nom}</div><div class="muted">${u.ville}</div></div>`).join("")}</div>`;
+  } else if(a.view==="fac"){
+    body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.univ.nom}</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${a.univ.facultes.map(f=>`<div class="card card-h" style="padding:24px" onclick="aPickFac('${f.id}')"><h3 style="font-size:18px;color:var(--ink);font-weight:600;margin:0 0 6px">${f.nom}</h3><div class="muted">${state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===f.id).length} contenus</div></div>`).join("")}</div>`;
+  } else if(a.view==="niv"){
+    body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom}</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">${["L1","L2","L3"].map(n=>`<div class="card card-h" style="padding:24px;text-align:center" onclick="aPickNiv('${n}')"><div class="serif" style="font-size:32px;color:var(--ink)">${n}</div><div class="muted">${state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===a.fac.id&&c.annee===n).length} contenus</div></div>`).join("")}</div>`;
+  } else if(a.view==="mat"){
+    const mats=matieresFor(a.univ.id,a.fac.id,a.niv);
+    body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom} · ${a.niv}</h2><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${mats.map((m,i)=>`<div class="card card-h" style="padding:20px" onclick="aPickMat(${i})"><div style="display:flex;justify-content:space-between"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0">${m}</h3><span style="color:var(--muted)">›</span></div><div class="muted" style="margin-top:8px">${TYPES.map(t=>countMat(a.univ.id,a.fac.id,a.niv,m,t)).reduce((x,y)=>x+y,0)} contenus</div></div>`).join("")}</div>`;
+  } else { body=AdminManage(); }
+  return `<div class="wrap fade" style="padding:24px 0 0">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">${aCrumb()}<button class="btn btn-ghost btn-sm" onclick="nav('landing')">Voir le site</button></div>
+    ${body}</div>`;
+}
+function AdminManage(){
+  const a=state.a, o=state.opt;
+  let list=itemsFor(a.univ.id,a.fac.id,a.niv,a.mat,a.tab).slice();
+  if(a.sort==="recent")list.sort((x,y)=>(y.ts||0)-(x.ts||0));
+  else if(a.sort==="az")list.sort((x,y)=>x.titre.localeCompare(y.titre));
+  const modeSeg=[["coin","Coin"],["bandeau","Bandeau bas"],["mosaique","Mosaïque (fond)"]];
+  return `<div class="grid" style="grid-template-columns:330px 1fr;gap:24px;align-items:start">
+    <div>
+      <div class="card" style="padding:20px">
+        <div class="muted" style="margin-bottom:4px">Upload dans</div>
+        <div style="font-weight:600;color:var(--ink);font-size:15px;margin-bottom:2px">${a.mat}</div>
+        <div class="muted" style="margin-bottom:14px">${a.univ.ville} · ${a.fac.nom} · ${a.niv} · <b style="color:var(--accent)">${kindLabel[a.tab]}</b></div>
+        <div class="dz" id="dz"><strong>Dépose un fichier</strong><br/>il sera rangé ici<input type="file" id="fi" accept="image/*,application/pdf" multiple style="display:none"/></div>
+      </div>
+      <div class="card" style="padding:20px;margin-top:14px">
+        <h3 style="font-size:15px;color:var(--ink);font-weight:600;margin:0 0 12px">Placement du QR</h3>
+        <div class="seg sm" style="margin-bottom:6px">${modeSeg.map(([m,l])=>`<button class="${o.mode===m?"on":""}" onclick="state.opt.mode='${m}';render()">${l}</button>`).join("")}</div>
+        <div class="muted" style="margin-bottom:10px">${o.mode==="mosaique"?"Répété en fond sur toute la page — impossible à recadrer.":o.mode==="bandeau"?"Bandeau répété en bas de chaque page.":"Un QR dans un coin."}</div>
+        ${o.mode==="coin"?`<div class="seg sm" style="margin-bottom:10px">${[["top-left","↖"],["top-right","↗"],["bottom-left","↙"],["bottom-right","↘"]].map(([c,e])=>`<button class="${o.corner===c?"on":""}" onclick="state.opt.corner='${c}';render()">${e}</button>`).join("")}</div>`:""}
+        <div class="ctrl"><div class="ctrl-row"><span>Taille</span><b id="szv">${o.sizePct} %</b></div><input type="range" id="sz" min="3" max="20" value="${o.sizePct}"/></div>
+        <div class="ctrl"><div class="ctrl-row"><span>Opacité</span><b id="opv">${Math.round(o.opacity*100)} %</b></div><input type="range" id="op" min="6" max="100" value="${Math.round(o.opacity*100)}"/></div>
+      </div>
+      <div class="card" style="padding:20px;margin-top:14px">
+        <h3 style="font-size:15px;color:var(--ink);font-weight:600;margin:0 0 4px">Tracer une fuite</h3>
+        <p class="muted" style="margin:0 0 10px">Scanne, importe ou colle le QR retrouvé.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-ink btn-sm" id="scanStart" onclick="startScan()">📷 Scanner</button>
+          <button class="btn btn-ghost btn-sm" id="scanStop" style="display:none" onclick="stopScan()">Arrêter</button>
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer">Importer une image<input type="file" accept="image/*" style="display:none" onchange="traceImage(this)"/></label>
+        </div>
+        <div id="scanWrap" style="display:none;margin-bottom:10px"><video id="scanVid" playsinline muted style="width:100%;border-radius:10px;background:#000"></video><div class="muted" style="text-align:center;margin-top:4px">Vise le QR…</div></div>
+        <input class="input" id="ti" placeholder="ou colle : STUDIA|abc123|..."/>
+        <button class="btn btn-accent btn-sm" style="margin-top:8px" onclick="traceText()">Identifier</button><div id="to"></div>
+      </div>
+      <div class="note" style="margin-top:14px">⚠️ <div>Le tatouage protège tes contenus <b>originaux</b>. Déclare-le dans tes CGU.</div></div>
+    </div>
+    <div>
+      <div class="tabs">${TYPES.map(t=>`<button class="${a.tab===t?"on":""}" onclick="aSet('tab','${t}')">${kindLabel[t]} <span style="color:var(--muted);font-weight:400">${countMat(a.univ.id,a.fac.id,a.niv,a.mat,t)}</span></button>`).join("")}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div class="muted">${list.length} élément${list.length>1?"s":""}</div>
+        <div class="seg sm">${[["recent","Récents"],["az","A-Z"]].map(([s,l])=>`<button class="${a.sort===s?"on":""}" onclick="aSet('sort','${s}')">${l}</button>`).join("")}</div></div>
+      <div id="aList">${adminListHTML(list)}</div>
+    </div>
+  </div>`;
+}
+function adminListHTML(list){
+  if(!list.length)return `<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Rien ici. Uploade un fichier ou ajoute du contenu.</div>`;
+  return list.map(c=>{const up=c.source==="upload";
+    return `<div class="card row" style="align-items:flex-start">
+      <div class="thumb">${c.thumb?`<img src="${c.thumb}"/>`:(up?"PDF":kindIcon[c.type])}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><span class="tag">${up?"UPLOAD":"Catalogue"}</span>${up&&c.date?`<span class="tag">${c.date}</span>`:""}</div>
+        <input class="input" style="padding:7px 10px;font-size:13px;margin-bottom:8px" value="${esc(c.titre)}" oninput="updField('${c.id}','titre',this.value)"/>
+        ${up?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${c.qr?`<div class="qrmini"><img src="${c.qr}"/></div>`:`<div class="qrmini"></div>`}${c.token?`<span class="token">${c.token}</span>`:'<span class="muted">génération…</span>'}${c.outUrl?`<a class="btn btn-ink btn-sm" href="${c.outUrl}" download="${c.outName}">Télécharger (tatoué)</a>`:""}<button class="btn btn-ghost btn-sm" onclick="regen('${c.id}')">Régénérer</button><button class="btn btn-ghost btn-sm" onclick="delItem('${c.id}')">Supprimer</button></div>${c.error?`<div style="color:#B4453A;font-size:13px;margin-top:6px">${c.error}</div>`:""}`:`<div class="muted">${c.tuteur} · ${c.note}/20 · ${c.duree||""}</div>`}
+      </div></div>`;
+  }).join("");
+}
+function aRefreshList(){const el=document.getElementById("aList");if(!el)return;const a=state.a;let list=itemsFor(a.univ.id,a.fac.id,a.niv,a.mat,a.tab).slice();if(a.sort==="recent")list.sort((x,y)=>(y.ts||0)-(x.ts||0));else if(a.sort==="az")list.sort((x,y)=>x.titre.localeCompare(y.titre));el.innerHTML=adminListHTML(list);}
+function updField(id,k,v){const c=state.contenus.find(x=>x.id===id);if(c)c[k]=v;}
+function delItem(id){state.contenus=state.contenus.filter(c=>c.id!==id);render();}
+
+function bindAdmin(){
+  const dz=document.getElementById("dz"),fi=document.getElementById("fi");
+  if(dz&&fi){dz.onclick=()=>fi.click();fi.onchange=()=>{if(fi.files.length)handleFiles([...fi.files]);fi.value="";};
+    ["dragover","dragenter"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("drag");}));
+    ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag");}));
+    dz.addEventListener("drop",e=>{if(e.dataTransfer.files.length)handleFiles([...e.dataTransfer.files]);});}
+  const sz=document.getElementById("sz"),op=document.getElementById("op");
+  if(sz)sz.oninput=()=>{state.opt.sizePct=+sz.value;document.getElementById("szv").textContent=sz.value+" %";};
+  if(op)op.oninput=()=>{state.opt.opacity=+op.value/100;document.getElementById("opv").textContent=op.value+" %";};
+}
+
+/* ===== QR + watermark ===== */
+function genId(){return Math.random().toString(36).slice(2,8);}
+function today(){return new Date().toISOString().slice(0,10);}
+function fileToDataURL(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f);});}
+function loadImage(s){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=s;});}
+function makeQR(text,size){return new Promise(res=>{const h=document.createElement("div");document.getElementById("qrfactory").appendChild(h);new QRCode(h,{text,width:size,height:size,correctLevel:QRCode.CorrectLevel.M});setTimeout(()=>{const cv=h.querySelector("canvas");const u=cv?cv.toDataURL("image/png"):h.querySelector("img").src;h.remove();res(u);},40);});}
+function placeOnCanvas(ctx,W,H,qr,o){
+  const min=Math.min(W,H), s=Math.max(24,Math.round(min*o.sizePct/100)), pad=Math.round(min*.02);
+  if(o.mode==="mosaique"){const gap=s*1.7;ctx.globalAlpha=o.opacity;for(let y=pad;y<H;y+=gap)for(let x=pad;x<W;x+=gap)ctx.drawImage(qr,x,y,s,s);ctx.globalAlpha=1;}
+  else if(o.mode==="bandeau"){const n=Math.max(1,Math.floor(W/(s*1.6)));ctx.globalAlpha=Math.min(1,o.opacity+.08);ctx.fillStyle="#fff";ctx.fillRect(0,H-s-pad*2,W,s+pad*2);ctx.globalAlpha=o.opacity;for(let i=0;i<n;i++){const x=(i+.5)*(W/n)-s/2;ctx.drawImage(qr,x,H-s-pad,s,s);}ctx.globalAlpha=1;}
+  else{let x=pad,y=pad;if(o.corner.includes("right"))x=W-s-pad;if(o.corner.includes("bottom"))y=H-s-pad;ctx.globalAlpha=Math.min(1,o.opacity+.15);ctx.fillStyle="#fff";ctx.fillRect(x-2,y-2,s+4,s+4);ctx.globalAlpha=o.opacity;ctx.drawImage(qr,x,y,s,s);ctx.globalAlpha=1;}
+}
+async function watermarkImage(file,token){
+  const img=await loadImage(await fileToDataURL(file));
+  const cv=document.createElement("canvas");cv.width=img.naturalWidth;cv.height=img.naturalHeight;
+  const ctx=cv.getContext("2d");ctx.drawImage(img,0,0);
+  const qr=await loadImage(await makeQR(token,160));
+  placeOnCanvas(ctx,cv.width,cv.height,qr,state.opt);
+  return cv.toDataURL("image/png");
+}
+async function watermarkPDF(file,token){
+  const doc=await PDFLib.PDFDocument.load(await file.arrayBuffer(),{ignoreEncryption:true});
+  const png=await doc.embedPng(await (await fetch(await makeQR(token,256))).arrayBuffer());
+  const o=state.opt;
+  doc.getPages().forEach(p=>{const{width:W,height:H}=p.getSize();const min=Math.min(W,H),s=Math.max(20,min*o.sizePct/100),pad=min*.03;
+    if(o.mode==="mosaique"){const gap=s*1.7;for(let y=pad;y<H;y+=gap)for(let x=pad;x<W;x+=gap)p.drawImage(png,{x,y,width:s,height:s,opacity:o.opacity});}
+    else if(o.mode==="bandeau"){const n=Math.max(1,Math.floor(W/(s*1.6)));for(let i=0;i<n;i++){const x=(i+.5)*(W/n)-s/2;p.drawImage(png,{x,y:pad,width:s,height:s,opacity:o.opacity});}}
+    else{let x=pad,y=pad;if(o.corner.includes("right"))x=W-s-pad;if(o.corner.includes("top"))y=H-s-pad;p.drawImage(png,{x,y,width:s,height:s,opacity:o.opacity});}
+  });
+  return URL.createObjectURL(new Blob([await doc.save()],{type:"application/pdf"}));
+}
+async function processRecord(c){
+  c.token=`STUDIA|${c.id}|c:${c.account}|${c.date}`;
+  c.qr=await makeQR(c.token,160);
+  try{if(c.kind==="image"){c.outUrl=await watermarkImage(c.file,c.token);c.outName=c.titre.replace(/\.[^.]+$/,"")+"_tatoue.png";c.thumb=c.outUrl;}
+    else{c.outUrl=await watermarkPDF(c.file,c.token);c.outName=c.titre.replace(/\.[^.]+$/,"")+"_tatoue.pdf";}c.error=null;
+  }catch(e){c.error="Échec : "+e.message;}
+}
+async function handleFiles(files){
+  const a=state.a;
+  for(const file of files){
+    const kind=file.type==="application/pdf"?"pdf":(file.type.startsWith("image/")?"image":null);if(!kind)continue;
+    const c={id:genId(),source:"upload",kind,file,
+      univ:a.univ.id,faculte:a.fac.id,annee:a.niv,matiere:a.mat,type:a.tab,
+      account:ACCOUNT,email:ADMIN_EMAIL,date:today(),ts:Date.now(),
+      titre:file.name,tuteur:"—",note:"—",duree:"",gratuit:false,qr:null,outUrl:null,thumb:null,error:null};
+    if(kind==="image")c.thumb=await fileToDataURL(file);
+    state.contenus.push(c);render();
+    await processRecord(c);render();
+  }
+}
+async function regen(id){const c=state.contenus.find(x=>x.id===id);if(!c)return;c.outUrl=null;c.qr=null;render();await processRecord(c);render();}
+var scanStream=null, scanRAF=null;
+function resolveToken(str){
+  const out=document.getElementById("to"); if(!out)return;
+  const v=(str||"").trim(); if(!v){out.innerHTML="";return;}
+  const m=v.match(/STUDIA\|([a-z0-9]+)/i)||v.match(/^([a-z0-9]{6})$/i);
+  const id=m?m[1]:v;
+  const c=state.contenus.find(x=>x.id===id||x.token===v);
+  if(!c){out.innerHTML=`<div class="trace-result miss">Code lu : ${esc(v)} — aucun contenu de cette session ne correspond. (Avec le backend : recherche dans toute la base.)</div>`;return;}
+  const u=univById(c.univ), fac=facById(c.univ,c.faculte);
+  const rows=[["Compte",c.account||"—"],["Email",c.email||"—"],["Sujet",esc(c.titre)],["Emplacement",`${u?u.ville:""} ▸ ${fac?fac.nom:c.faculte} ▸ ${c.annee} ▸ ${c.matiere} ▸ ${kindLabel[c.type]}`],["Date",c.date||"—"],["ID",`<span class="token">${c.id}</span>`]];
+  out.innerHTML=`<div class="trace-result"><b>Fuite tracée ✓</b><div style="margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:13px">${rows.map(([k,val])=>`<span style="color:var(--sub)">${k}</span><span>${val}</span>`).join("")}</div><div class="muted" style="margin-top:8px">Email/IP réels = liés à l'abonné au moment du téléchargement (backend).</div></div>`;
+}
+function traceText(){resolveToken(document.getElementById("ti").value);}
+async function traceImage(input){
+  const f=input.files[0]; if(!f)return; input.value="";
+  if(typeof jsQR==="undefined"){document.getElementById("to").innerHTML='<div class="trace-result miss">Lecteur QR non chargé (réseau).</div>';return;}
+  try{const img=await loadImage(await fileToDataURL(f));const cv=document.createElement("canvas");cv.width=img.naturalWidth;cv.height=img.naturalHeight;const ctx=cv.getContext("2d");ctx.drawImage(img,0,0);const d=ctx.getImageData(0,0,cv.width,cv.height);const code=jsQR(d.data,cv.width,cv.height);if(code)resolveToken(code.data);else document.getElementById("to").innerHTML='<div class="trace-result miss">Aucun QR détecté sur cette image.</div>';}
+  catch(e){document.getElementById("to").innerHTML='<div class="trace-result miss">Erreur de lecture : '+e.message+'</div>';}
+}
+async function startScan(){
+  const v=document.getElementById("scanVid");
+  if(typeof jsQR==="undefined"){document.getElementById("to").innerHTML='<div class="trace-result miss">Lecteur QR non chargé (réseau).</div>';return;}
+  try{
+    scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    v.srcObject=scanStream;await v.play();
+    document.getElementById("scanWrap").style.display="block";
+    document.getElementById("scanStart").style.display="none";
+    document.getElementById("scanStop").style.display="inline-flex";
+    scanTick();
+  }catch(e){document.getElementById("to").innerHTML='<div class="trace-result miss">Caméra indisponible ('+e.message+'). Utilise « Importer une image ».</div>';}
+}
+function scanTick(){
+  const v=document.getElementById("scanVid");
+  if(!v||!scanStream)return;
+  if(v.readyState>=2&&v.videoWidth){
+    const cv=document.createElement("canvas");cv.width=v.videoWidth;cv.height=v.videoHeight;
+    const ctx=cv.getContext("2d");ctx.drawImage(v,0,0,cv.width,cv.height);
+    const d=ctx.getImageData(0,0,cv.width,cv.height);
+    const code=jsQR(d.data,cv.width,cv.height);
+    if(code){stopScan();resolveToken(code.data);return;}
+  }
+  scanRAF=requestAnimationFrame(scanTick);
+}
+function stopScan(){
+  if(scanRAF)cancelAnimationFrame(scanRAF);scanRAF=null;
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+  const w=document.getElementById("scanWrap");if(w)w.style.display="none";
+  const s=document.getElementById("scanStart"),st=document.getElementById("scanStop");if(s)s.style.display="inline-flex";if(st)st.style.display="none";
+}
+
+/* ===== modal ===== */
+function renderModal(){const r=document.getElementById("modalRoot");if(!state.modal){r.innerHTML="";return;}
+  const hasStripe=CONFIG.STRIPE_LINK_MENSUEL||CONFIG.STRIPE_LINK_SEMESTRE;
+  r.innerHTML=`<div class="modal-bg" onclick="setModal(false)"><div class="modal fade" onclick="event.stopPropagation()"><div style="display:flex;justify-content:space-between"><span style="color:var(--accent)">✦</span><button style="background:none;border:none;color:var(--muted);cursor:pointer" onclick="setModal(false)">✕</button></div><h3 class="serif" style="font-size:26px;color:var(--ink);margin:12px 0 6px">Débloque tout Studia</h3><p style="font-size:14px;color:var(--sub);margin:0 0 18px;line-height:1.5">Accès illimité aux cours, TD et examens corrigés.</p><button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="startCheckout('semestre')">Pass semestriel — 39€</button><button class="btn btn-ghost" style="width:100%;margin-bottom:14px" onclick="startCheckout('mensuel')">Mensuel — 9€/mois</button>${hasStripe?'<p class="muted" style="text-align:center;margin:0">Paiement sécurisé via Stripe.</p>':`<div style="border-top:1px solid var(--border);padding-top:12px"><button class="btn btn-ink btn-sm" style="width:100%" onclick="subscribe()">Activer l'accès (démo)</button><p class="muted" style="text-align:center;margin-top:8px">Stripe non configuré — bouton démo.</p></div>`}</div></div>`;
+}
+
+window.addEventListener("load",()=>{if(typeof QRCode==="undefined")console.warn("QR lib non chargée");initSupabase();render();if(sb){loadContenus();restoreSession();}});
+</script>
+</body>
+</html>
