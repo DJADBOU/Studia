@@ -601,6 +601,23 @@ async function handleFiles(files){
       account:ACCOUNT,email:ADMIN_EMAIL,date:today(),ts:Date.now(),
       titre:file.name,tuteur:"—",note:"—",duree:"",gratuit:false,qr:null,outUrl:null,thumb:null,error:null};
     if(kind==="image")c.thumb=await fileToDataURL(file);
+
+    // --- NOUVEAU : Sauvegarde sur Supabase ---
+    if(sb){
+      const fileName = c.id + (kind === "pdf" ? ".pdf" : ".png");
+      // 1. Upload dans le bucket Storage privé
+      await sb.storage.from("sujets").upload(fileName, file);
+      
+      // 2. Création de la ligne dans la base de données
+      await sb.from("contenus").insert([{
+        id: c.id, source: c.source, univ: c.univ, faculte: c.faculte, annee: c.annee,
+        matiere: c.matiere, type: c.type, titre: c.titre, tuteur: c.tuteur,
+        note: c.note, duree: c.duree, gratuit: c.gratuit, account: c.account,
+        email: c.email, date: c.date, ts: c.ts, file_path: fileName
+      }]);
+    }
+    // ------------------------------------------
+
     state.contenus.push(c);render();
     await processRecord(c);render();
   }
