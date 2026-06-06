@@ -11,17 +11,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
-:root{--bg:#FBFBFA;--surface:#FFFFFF;--border:#EAE9E6;--borderStrong:#DEDDD9;--ink:#1A1A18;--text:#37352F;--sub:#6F6E69;--muted:#9B9A94;--accent:#0F7A6B;--accentSoft:#E7F2EF;--amber:#9A6A18;--amberSoft:#F6EFDF;--sans:'Geist',-apple-system,BlinkMacSystemFont,sans-serif;--serif:'Instrument Serif',Georgia,serif}
+:root{--bg:#FBFBFA;--surface:#FFFFFF;--border:#EAE9E6;--borderStrong:#DEDDD9;--ink:#1A1A18;--text:#37352F;--sub:#6F6E69;--muted:#9B9A94;--accent:#34C759;--accentDark:#2A9D47;--accentSoft:#E7F8EC;--amber:#9A6A18;--amberSoft:#F6EFDF;--sans:'Geist',-apple-system,BlinkMacSystemFont,sans-serif;--serif:'Instrument Serif',Georgia,serif}
 *{box-sizing:border-box}
 body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
 button{font-family:var(--sans);cursor:pointer}
-input,select{font-family:var(--sans)}
+input,select,textarea{font-family:var(--sans)}
 a{color:inherit;text-decoration:none}
 .hidden{display:none!important}
 .wrap{max-width:1100px;margin:0 auto;padding:0 24px}
-.logo{width:26px;height:26px;border-radius:7px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:17px}
+.logo{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 50% 30%,#5BD974 0%,#34C759 45%,#1E8C3C 100%);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--sans);font-weight:700;font-size:16px;box-shadow:0 1px 3px rgba(30,140,60,.25);letter-spacing:-.5px}
+.ulogo{width:38px;height:38px;border-radius:9px;background:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:18px;flex-shrink:0;overflow:hidden;color:var(--ink)}
+.ulogo img{max-width:80%;max-height:80%;object-fit:contain}
+.ulogo.fallback{background:var(--ink);color:#fff;border:none}
 .serif{font-family:var(--serif);font-weight:400;letter-spacing:-.3px}
-.pill{font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:6px;background:var(--accentSoft);color:var(--accent);white-space:nowrap}
+.pill{font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:6px;background:var(--accentSoft);color:var(--accentDark);white-space:nowrap}
 .tag{font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:6px;background:#F2F1EE;color:var(--sub);white-space:nowrap}
 .tag.amber{background:var(--amberSoft);color:var(--amber)}
 .btn{border:1px solid transparent;border-radius:8px;font-weight:500;font-size:14px;padding:9px 16px;display:inline-flex;align-items:center;gap:7px;justify-content:center;transition:opacity .15s}
@@ -56,7 +59,7 @@ a{color:inherit;text-decoration:none}
 .tabs button{background:none;border:none;font-size:14.5px;padding:10px 14px;display:flex;align-items:center;gap:7px;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabs button.on{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
 .row{padding:16px;display:flex;align-items:center;gap:14px;margin-bottom:10px}
-.ic{width:44px;height:44px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--accentSoft);color:var(--accent);font-size:18px}
+.ic{width:44px;height:44px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--accentSoft);color:var(--accentDark);font-size:18px}
 .ic.lock{background:#F2F1EE;color:var(--muted)}
 .grid{display:grid;gap:14px}
 .dz{border:1.5px dashed var(--borderStrong);border-radius:12px;padding:24px 16px;text-align:center;color:var(--sub);transition:all .15s;cursor:pointer}
@@ -66,7 +69,7 @@ a{color:inherit;text-decoration:none}
 .ctrl-row{display:flex;justify-content:space-between;font-size:13px;color:var(--sub);margin-bottom:6px}
 .ctrl-row b{color:var(--ink);font-weight:500}
 input[type=range]{width:100%;accent-color:var(--accent)}
-.token{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--accent);background:var(--accentSoft);padding:3px 7px;border-radius:6px;word-break:break-all}
+.token{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--accentDark);background:var(--accentSoft);padding:3px 7px;border-radius:6px;word-break:break-all}
 .thumb{width:70px;height:70px;border-radius:9px;border:1px solid var(--border);background:#F2F1EE;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;overflow:hidden}
 .thumb img{width:100%;height:100%;object-fit:cover}
 .qrmini{width:46px;height:46px;border:1px solid var(--border);border-radius:7px;padding:3px;background:#fff;flex-shrink:0}
@@ -77,7 +80,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .modal-bg{position:fixed;inset:0;z-index:60;background:rgba(26,26,24,.45);display:flex;align-items:center;justify-content:center;padding:20px}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;max-width:380px;width:100%;padding:28px}
 .sec{padding:60px 0;border-top:1px solid var(--border)}
-.photo{position:relative;overflow:hidden;background:linear-gradient(135deg,#0F7A6B,#0b3b34)}
+.photo{position:relative;overflow:hidden;background:linear-gradient(135deg,#34C759,#1E8C3C)}
 .photo img{width:100%;height:100%;object-fit:cover;display:block}
 .hero-img{position:absolute;inset:0;z-index:0;overflow:hidden}
 .hero-img img{width:100%;height:100%;object-fit:cover}
@@ -98,19 +101,19 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <script>
 /* ===== CONFIG ===== */
 const ACCOUNT="admin", ADMIN_EMAIL="djad@studia.app";
-/* ===== À REMPLIR POUR PASSER EN PRODUCTION ===== */
 const CONFIG={
-  SUPABASE_URL:"https://aswkkhdeiedjlxydxzbn.supabase.co",        // ← https://xxxx.supabase.co
-  SUPABASE_ANON_KEY:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzd2traGRlaWVkamx4eWR4emJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2ODY5OTcsImV4cCI6MjA5NjI2Mjk5N30.w9zsZ2Z6Kh-yQiixNpdCm9wj1Eb-lHYBiWtw3yc-Fnk",   // ← clé "anon public" (jamais la clé secrète !)
-  STRIPE_LINK_MENSUEL:"", // ← Stripe Payment Link (abo mensuel)
-  STRIPE_LINK_SEMESTRE:"",// ← Stripe Payment Link (abo semestriel)
-  FUNCTIONS_URL:"https://aswkkhdeiedjlxydxzbn.supabase.co/functions/v1",       // ← Edge Functions Supabase : https://xxxx.supabase.co/functions/v1
+  SUPABASE_URL:"https://aswkkhdeiedjlxydxzbn.supabase.co",
+  SUPABASE_ANON_KEY:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzd2traGRlaWVkamx4eWR4emJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2ODY5OTcsImV4cCI6MjA5NjI2Mjk5N30.w9zsZ2Z6Kh-yQiixNpdCm9wj1Eb-lHYBiWtw3yc-Fnk",
+  STRIPE_LINK_MENSUEL:"",
+  STRIPE_LINK_SEMESTRE:"",
+  FUNCTIONS_URL:"https://aswkkhdeiedjlxydxzbn.supabase.co/functions/v1",
 };
 const KW={uca:"campus,university",amu:"university,architecture",p1:"paris,building",tse:"campus,modern"};
 let sb=null;
 function initSupabase(){try{if(CONFIG.SUPABASE_URL&&CONFIG.SUPABASE_ANON_KEY&&window.supabase){sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY);}}catch(e){console.warn("Supabase init:",e.message);}}
 async function loadContenus(){if(!sb)return;try{const{data,error}=await sb.from("contenus").select("*");if(!error&&data&&data.length){state.contenus=data.map(r=>({...r,source:r.source||"seed"}));render();}}catch(e){console.warn("loadContenus:",e.message);}}
-async function restoreSession(){if(!sb)return;try{const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=data.user.email===ADMIN_EMAIL;state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;render();}}catch(e){}}
+async function checkSubscription(){if(!sb||!state.user)return;try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;const{data}=await sb.from("subscribers").select("status").eq("user_id",u.user.id).maybeSingle();if(data&&data.status==="active"){state.subscribed=true;render();}}catch(e){}}
+async function restoreSession(){if(!sb)return;try{const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=data.user.email===ADMIN_EMAIL;state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;render();await checkSubscription();}}catch(e){}}
 function goCheckout(plan){const link=plan==="semestre"?CONFIG.STRIPE_LINK_SEMESTRE:CONFIG.STRIPE_LINK_MENSUEL;if(link){window.location.href=link;}else{state.modal=true;renderModal();}}
 async function authToken(){if(!sb)return null;try{const{data}=await sb.auth.getSession();return data&&data.session?data.session.access_token:null;}catch(e){return null;}}
 async function startCheckout(plan){
@@ -124,7 +127,46 @@ async function downloadProtected(id){
   try{const t=await authToken();const res=await fetch(CONFIG.FUNCTIONS_URL+"/download?id="+encodeURIComponent(id),{headers:{"Authorization":"Bearer "+t}});if(!res.ok){alert("Accès refusé : abonnement requis.");return;}const blob=await res.blob();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="studia-"+id;document.body.appendChild(a);a.click();a.remove();}catch(e){alert("Erreur : "+e.message);}
 }
 
+/* ===== Supabase : persistance contenus ===== */
+function dbRow(c){
+  return {id:c.id,source:c.source||"upload",univ:c.univ,faculte:c.faculte,annee:c.annee,matiere:c.matiere,type:c.type,
+    titre:c.titre,tuteur:c.tuteur,note:c.note,duree:c.duree,gratuit:!!c.gratuit,flagship:!!c.flagship,
+    file_path:c.file_path||null,video_url:c.video_url||null,description:c.description||null,
+    account:c.account||ACCOUNT,email:c.email||(state.user&&state.user.email)||null,date:c.date||today(),ts:c.ts||Date.now()};
+}
+async function dbInsertContenu(c){if(!sb)return{ok:false,offline:true};try{const{error}=await sb.from("contenus").insert(dbRow(c));if(error){console.warn("insert:",error.message);return{ok:false,error:error.message};}return{ok:true};}catch(e){return{ok:false,error:e.message};}}
+async function dbUpdateContenu(id,fields){if(!sb)return;try{const{error}=await sb.from("contenus").update(fields).eq("id",id);if(error)console.warn("update:",error.message);}catch(e){console.warn(e);}}
+async function dbDeleteContenu(id,file_path){if(!sb)return;try{if(file_path){try{await sb.storage.from("sujets").remove([file_path]);}catch(e){}}const{error}=await sb.from("contenus").delete().eq("id",id);if(error)console.warn("delete:",error.message);}catch(e){console.warn(e);}}
+async function dbUploadFile(file,id){
+  if(!sb)return null;
+  try{
+    const ext=(file.name.match(/\.[^.]+$/)||[""])[0]||"";
+    const path=`${id}${ext}`;
+    const{error}=await sb.storage.from("sujets").upload(path,file,{upsert:true,contentType:file.type||undefined});
+    if(error){console.warn("storage upload:",error.message);return null;}
+    return path;
+  }catch(e){console.warn(e);return null;}
+}
+
+/* ===== utils vidéo ===== */
+function parseVideoEmbed(url){
+  if(!url)return null;
+  const u=url.trim();
+  let m=u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/);
+  if(m)return{kind:"youtube",embed:`https://www.youtube.com/embed/${m[1]}?rel=0`,thumb:`https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg`};
+  m=u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if(m)return{kind:"vimeo",embed:`https://player.vimeo.com/video/${m[1]}`,thumb:null};
+  if(/\.(mp4|webm|mov|m4v)(\?|$)/i.test(u))return{kind:"file",embed:u,thumb:null};
+  return null;
+}
+
 /* ===== DATA ===== */
+const UNIV_LOGOS={
+  uca:"https://upload.wikimedia.org/wikipedia/fr/thumb/4/4f/Logo_Universit%C3%A9_C%C3%B4te_d%27Azur.svg/250px-Logo_Universit%C3%A9_C%C3%B4te_d%27Azur.svg.png",
+  amu:"https://upload.wikimedia.org/wikipedia/fr/thumb/8/87/Logo_Aix-Marseille_Universit%C3%A9.svg/250px-Logo_Aix-Marseille_Universit%C3%A9.svg.png",
+  p1:"https://upload.wikimedia.org/wikipedia/fr/thumb/c/cd/Logo_universit%C3%A9_Paris_1_Panth%C3%A9on-Sorbonne.svg/250px-Logo_universit%C3%A9_Paris_1_Panth%C3%A9on-Sorbonne.svg.png",
+  tse:"https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Logo_TSE.png/250px-Logo_TSE.png"
+};
 const UNIVS=[
  {id:"uca",nom:"Université Côte d'Azur",ville:"Nice",actif:true,facultes:[
    {id:"eg",nom:"Économie & Gestion",mat:{
@@ -178,6 +220,7 @@ const state={
   subscribed:false, adminAuthed:false, modal:false, user:null, menu:false, authMode:"login",
   opt:{mode:"coin",corner:"bottom-right",sizePct:8,opacity:.35},
   a:{view:"univ",univ:null,fac:null,niv:"L1",mat:null,tab:"Cours",sort:"recent"},
+  newC:{open:false},
   contenus:seedContenus(),
 };
 
@@ -195,6 +238,11 @@ const matieresFor=(uid,fid,annee)=>{const f=facById(uid,fid);const m1=(f&&f.mat&
 const countMat=(uid,fid,annee,m,type)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type).length;
 const itemsFor=(uid,fid,annee,m,type)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type);
 const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+function univLogoHTML(u){
+  const url=UNIV_LOGOS[u.id];
+  if(url)return `<div class="ulogo"><img src="${url}" alt="${esc(u.nom)}" onerror="const p=this.parentElement;p.classList.add('fallback');p.innerHTML='${u.nom[0]}'"/></div>`;
+  return `<div class="ulogo fallback">${u.nom[0]}</div>`;
+}
 
 /* ===== handlers (public) ===== */
 function nav(v){state.view=v;render();}
@@ -215,18 +263,25 @@ async function doAuth(){
   const email=(document.getElementById("authEmail").value||"").trim();
   const pass=(document.getElementById("authPass").value||"");
   const err=document.getElementById("authErr");
+  if(err){err.style.color="#B4453A";err.textContent="";}
   if(!email||!pass){if(err)err.textContent="Renseigne ton email et ton mot de passe.";return;}
+  if(pass.length<6){if(err)err.textContent="Mot de passe : 6 caractères minimum.";return;}
   if(sb){
     try{
-      const {data,error}=await (state.authMode==="signup"?sb.auth.signUp({email,password:pass}):sb.auth.signInWithPassword({email,password:pass}));
+      const isSignup=state.authMode==="signup";
+      const {data,error}=await (isSignup?sb.auth.signUp({email,password:pass}):sb.auth.signInWithPassword({email,password:pass}));
       if(error){if(err)err.textContent=error.message;return;}
-      const isAdmin=email===ADMIN_EMAIL;state.user={email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;state.view=isAdmin?"admin":"univs";state.menu=false;render();return;
+      if(isSignup&&!data.session){
+        if(err){err.style.color="var(--accentDark)";err.textContent="✓ Compte créé. Vérifie ta boîte mail pour confirmer.";}
+        return;
+      }
+      const isAdmin=email===ADMIN_EMAIL;state.user={email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;state.view=isAdmin?"admin":"univs";state.menu=false;render();checkSubscription();return;
     }catch(e){if(err)err.textContent=e.message;return;}
   }
-  loginStudent(email); // mode démo (sans Supabase configuré)
+  loginStudent(email);
 }
 async function googleAuth(){if(sb){try{await sb.auth.signInWithOAuth({provider:"google"});}catch(e){}}else{loginStudent("etudiant@exemple.fr");}}
-function logout(){if(sb){try{sb.auth.signOut();}catch(e){}}state.user=null;state.adminAuthed=false;state.menu=false;state.view="landing";render();}
+function logout(){if(sb){try{sb.auth.signOut();}catch(e){}}state.user=null;state.adminAuthed=false;state.subscribed=false;state.menu=false;state.view="landing";render();}
 
 /* ===== RENDER ===== */
 function render(){
@@ -257,25 +312,26 @@ function Landing(){
     <div class="hero-img"><img src="https://loremflickr.com/1400/760/university,library,study?lock=7" onerror="this.remove()"/></div>
     <div class="wrap" style="position:relative;z-index:1;padding:88px 0 64px;max-width:760px">
       <span class="pill">Par les étudiants, pour les étudiants</span>
-      <h1 class="serif" style="font-size:clamp(40px,6.5vw,68px);line-height:1.04;color:var(--ink);margin:20px 0 18px">Comprendre, s'entraîner, réussir.</h1>
-      <p style="font-size:20px;line-height:1.55;color:var(--sub);margin:0 0 30px;max-width:600px">Cours, TD et examens corrigés — expliqués en vidéo par les majors de ta promo. Pour que chaque étudiant ait vraiment les moyens de réussir sa licence.</p>
-      <div style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn btn-ink btn-lg" onclick="nav('univs')">Choisir ma fac →</button><button class="btn btn-ghost btn-lg" onclick="nav('tuteur')">Devenir tuteur</button></div>
+      <h1 class="serif" style="font-size:clamp(40px,6.5vw,68px);line-height:1.04;color:var(--ink);margin:20px 0 18px">Comprendre, s'entraîner, réussir&nbsp;!</h1>
+      <p style="font-size:20px;line-height:1.55;color:var(--sub);margin:0 0 14px;max-width:600px">Cours, TD et examens corrigés — expliqués en vidéo par les majors de ta promo. Pour que chaque étudiant ait vraiment les moyens de réussir sa licence.</p>
+      <p style="font-size:16px;line-height:1.5;color:var(--accentDark);margin:0 0 30px;font-weight:500">✦ Accède à ton programme personnalisé</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn btn-ink btn-lg" onclick="nav('univs')">Choisir mon université →</button><button class="btn btn-ghost btn-lg" onclick="nav('tuteur')">Devenir tuteur</button></div>
     </div>
   </div>
   <div class="wrap">
     <section class="sec" style="border:none;padding-top:24px">
-      <h2 class="serif" style="font-size:32px;color:var(--ink);margin:0 0 6px">Les facs déjà sur Studia</h2>
+      <h2 class="serif" style="font-size:32px;color:var(--ink);margin:0 0 6px">Les universités déjà sur Studia</h2>
       <p class="muted" style="margin:0 0 22px">On s'étend campus par campus.</p>
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
         ${UNIVS.map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.6"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
           <div class="photo" style="aspect-ratio:16/10"><img loading="lazy" src="https://loremflickr.com/600/380/${KW[u.id]||"university,campus"}?lock=${i+2}" onerror="this.remove()"/></div>
-          <div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:600;color:var(--ink);font-size:15px">${u.nom}</div>${u.actif?'<span class="pill">Live</span>':'<span class="tag">Bientôt</span>'}</div><div class="muted" style="margin-top:3px">${u.ville}</div></div>
+          <div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="display:flex;align-items:center;gap:10px;min-width:0">${univLogoHTML(u)}<div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.2">${u.nom}</div></div>${u.actif?'<span class="pill">Live</span>':'<span class="tag">Bientôt</span>'}</div><div class="muted" style="margin-top:8px">${u.ville}${u.actif?` · ${u.facultes.length} filières`:""}</div></div>
         </div>`).join("")}
       </div>
     </section>
     <section class="sec">
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px;align-items:center;border:none">
-        <div><h2 class="serif" style="font-size:34px;color:var(--ink);margin:0 0 14px">Notre mission</h2><p style="font-size:16px;color:var(--sub);line-height:1.65;margin:0">Trop d'étudiants décrochent faute d'explications claires, pas faute de travail. On remet les meilleurs étudiants au service des autres : ceux qui ont eu les meilleures notes expliquent la méthode, les pièges, et ce que le correcteur attend vraiment. Le savoir circule, tout le monde progresse.</p></div>
+        <div><h2 class="serif" style="font-size:34px;color:var(--ink);margin:0 0 14px">Notre mission</h2><p style="font-size:17px;color:var(--sub);line-height:1.65;margin:0">Trop d'étudiants décrochent faute d'explications claires, et non faute de travail. <b style="color:var(--ink);font-weight:600">Studia met les meilleurs étudiants à votre service&nbsp;!</b></p></div>
         <div class="photo" style="aspect-ratio:4/3;border-radius:14px"><img loading="lazy" src="https://loremflickr.com/640/480/students,study,group?lock=21" onerror="this.remove()"/></div>
       </div>
     </section>
@@ -292,7 +348,7 @@ function Landing(){
       </div>
     </section>
     <section class="sec" style="border:none">
-      <div class="card" style="background:var(--ink);border:none;padding:52px 32px;text-align:center"><h2 class="serif" style="font-size:38px;color:#fff;margin:0 0 10px">Trouve ta fac et commence.</h2><p style="font-size:16px;color:rgba(255,255,255,.7);margin:0 0 26px">Université, faculté, niveau — et accède à tout le programme.</p><button class="btn btn-accent btn-lg" onclick="nav('univs')">Choisir ma fac →</button></div>
+      <div class="card" style="background:var(--ink);border:none;padding:52px 32px;text-align:center"><h2 class="serif" style="font-size:38px;color:#fff;margin:0 0 10px">Trouve ton université et rejoins-nous&nbsp;!</h2><p style="font-size:16px;color:rgba(255,255,255,.7);margin:0 0 26px">Université, filière, niveau — et accède à tout le programme.</p><button class="btn btn-accent btn-lg" onclick="nav('univs')">Choisir mon université →</button></div>
     </section>
   </div>
   ${Footer()}</div>`;
@@ -328,7 +384,7 @@ function Ctx(){
   if(!state.univ)return "";
   return `<div class="ctxbar"><div class="wrap ctxbar-in">
     <span class="crumb" onclick="nav('univs')">${state.univ.ville}</span><span>▸</span>
-    <span class="crumb" onclick="nav('facultes')">${state.faculte?state.faculte.nom:"Faculté"}</span>
+    <span class="crumb" onclick="nav('facultes')">${state.faculte?state.faculte.nom:"Filière"}</span>
     ${state.faculte?`<span>▸</span><span class="crumb" onclick="nav('programme')">${state.annee}</span>`:""}
     ${state.matiere&&(state.view==="matiere"||state.view==="detail")?`<span>▸</span><span class="crumb" onclick="nav('matiere')">${state.matiere}</span>`:""}
   </div></div>`;
@@ -338,11 +394,11 @@ function Ctx(){
 function UnivsView(){
   return `<div class="wrap fade" style="padding:54px 0 0">
     <h1 class="serif" style="font-size:42px;color:var(--ink);margin:0 0 8px">Choisis ton université</h1>
-    <p style="font-size:15px;color:var(--sub);margin:0 0 30px">Studia s'étend fac par fac. Sélectionne la tienne.</p>
+    <p style="font-size:15px;color:var(--sub);margin:0 0 30px">Studia s'étend université par université. Sélectionne la tienne.</p>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
       ${UNIVS.map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.55"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
         <div class="photo" style="aspect-ratio:16/9"><img loading="lazy" src="https://loremflickr.com/600/340/${KW[u.id]||"university,campus"}?lock=${i+2}" onerror="this.remove()"/></div>
-        <div style="padding:18px"><div style="display:flex;justify-content:space-between;align-items:center"><div class="logo" style="background:${u.actif?"var(--ink)":"#D9D8D4"}">${u.nom[0]}</div>${u.actif?'<span class="pill">Disponible</span>':'<span class="tag">Bientôt</span>'}</div><div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.3;margin-top:12px">${u.nom}</div><div style="font-size:13px;color:var(--sub);margin-top:3px">${u.ville}${u.actif?` · ${u.facultes.length} facultés`:""}</div></div>
+        <div style="padding:18px"><div style="display:flex;justify-content:space-between;align-items:center">${univLogoHTML(u)}${u.actif?'<span class="pill">Disponible</span>':'<span class="tag">Bientôt</span>'}</div><div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.3;margin-top:12px">${u.nom}</div><div style="font-size:13px;color:var(--sub);margin-top:3px">${u.ville}${u.actif?` · ${u.facultes.length} filières`:""}</div></div>
       </div>`).join("")}
     </div>
   </div>`;
@@ -354,7 +410,7 @@ function FacultesView(){
   return `<div class="wrap fade" style="padding:32px 0 0">
     <button class="btn btn-ghost btn-sm" style="border:none;padding:0;color:var(--sub);margin-bottom:16px" onclick="nav('univs')">← Universités</button>
     <h1 class="serif" style="font-size:40px;color:var(--ink);margin:0 0 6px">${u.nom}</h1>
-    <p style="font-size:15px;color:var(--sub);margin:0 0 28px">Choisis ta faculté.</p>
+    <p style="font-size:15px;color:var(--sub);margin:0 0 28px">Choisis ta filière.</p>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
       ${u.facultes.map(f=>`<div class="card card-h" style="padding:24px" onclick="selectFaculte('${f.id}')">
         <div style="display:flex;justify-content:space-between;align-items:start"><h3 style="font-size:18px;color:var(--ink);font-weight:600;margin:0 0 6px">${f.nom}</h3><span style="color:var(--muted)">›</span></div>
@@ -390,7 +446,7 @@ function MatiereView(){
     <div style="max-width:760px">${items.length?items.map(it=>{
       const locked=!it.gratuit&&!state.subscribed;
       return `<div class="card card-h row" onclick="openItem('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":kindIcon[it.type]}</div>
-        <div style="flex:1;min-width:0"><div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span class="tag">${kindLabel[it.type]}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}${it.source==="upload"?'<span class="tag amber">Nouveau</span>':""}</div>
+        <div style="flex:1;min-width:0"><div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span class="tag">${kindLabel[it.type]}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}${it.source==="upload"?'<span class="tag amber">Nouveau</span>':""}${it.video_url?'<span class="pill">▶ Vidéo</span>':""}</div>
         <div style="font-size:15px;color:var(--ink);font-weight:500;margin-bottom:3px">${it.titre}</div><div class="muted">★ ${it.tuteur} · ${it.note}/20${it.duree?" · "+it.duree:""}</div></div><span style="color:var(--muted)">›</span></div>`;
     }).join(""):`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucun contenu ici pour l'instant.</div>`}</div>
   </div>`;
@@ -401,30 +457,70 @@ function Detail(){
   const labels=isCours?COURS:CORR;
   const sections=isUpload?null:(it.flagship?flagship:(isCours?coursTpl(it.titre):corrTpl(it.titre)));
   const vlabel=isCours?"Cours vidéo":"Correction vidéo";
+  const v=parseVideoEmbed(it.video_url);
   let media;
-  if(isUpload){
+  if(v&&unlocked){
+    if(v.kind==="file"){
+      media=`<div style="aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000"><video src="${v.embed}" controls style="width:100%;height:100%"></video></div>`;
+    }else{
+      media=`<div style="aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000"><iframe src="${v.embed}" style="width:100%;height:100%;border:0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;
+    }
+  }else if(v&&!unlocked){
+    media=`<div style="aspect-ratio:16/9;border-radius:14px;border:1px solid var(--border);background:#111;display:flex;align-items:center;justify-content:center;color:#fff;position:relative;overflow:hidden">${v.thumb?`<img src="${v.thumb}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(8px) brightness(.5)"/>`:""}<div style="text-align:center;padding:20px;position:relative"><div style="font-size:24px;margin-bottom:10px">🔒</div><div style="margin-bottom:14px">${vlabel} réservée aux abonnés</div><button class="btn btn-accent" onclick="setModal(true)">S'abonner pour débloquer</button></div></div>`;
+  }else if(isUpload){
     media=`<div class="card" style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;overflow:hidden;background:${it.thumb?"#111":"#F2F1EE"}">${unlocked?(it.thumb?`<img src="${it.thumb}" style="max-width:100%;max-height:100%;object-fit:contain"/>`:`<div style="text-align:center;color:var(--sub)"><div style="font-size:30px">📄</div>Document PDF</div>`):`<div style="text-align:center;color:#fff"><div style="font-size:24px;margin-bottom:10px">🔒</div><div style="margin-bottom:14px">Sujet réservé aux abonnés</div><button class="btn btn-accent" onclick="setModal(true)">S'abonner</button></div>`}</div>`;
   }else{
-    media=`<div style="aspect-ratio:16/9;border-radius:14px;border:1px solid var(--border);background:#111;display:flex;align-items:center;justify-content:center;color:#fff">${unlocked?`<div style="text-align:center"><div style="font-size:30px;opacity:.8">▶</div><div class="muted" style="color:rgba(255,255,255,.7)">${vlabel} · ${it.duree}</div></div>`:`<div style="text-align:center;padding:20px"><div style="font-size:24px;margin-bottom:10px">🔒</div><div style="margin-bottom:14px">${vlabel} réservée aux abonnés</div><button class="btn btn-accent" onclick="setModal(true)">S'abonner pour débloquer</button></div>`}</div>`;
+    media=`<div style="aspect-ratio:16/9;border-radius:14px;border:1px solid var(--border);background:#111;display:flex;align-items:center;justify-content:center;color:#fff">${unlocked?`<div style="text-align:center"><div style="font-size:30px;opacity:.8">▶</div><div class="muted" style="color:rgba(255,255,255,.7)">${vlabel} · ${it.duree||""}</div></div>`:`<div style="text-align:center;padding:20px"><div style="font-size:24px;margin-bottom:10px">🔒</div><div style="margin-bottom:14px">${vlabel} réservée aux abonnés</div><button class="btn btn-accent" onclick="setModal(true)">S'abonner pour débloquer</button></div>`}</div>`;
   }
   return `<div class="wrap fade" style="padding:30px 0 0;max-width:760px">
     <button class="btn btn-ghost btn-sm" style="border:none;padding:0;color:var(--sub);margin-bottom:18px" onclick="nav('matiere')">← Retour à la matière</button>
     <div style="display:flex;gap:8px;margin-bottom:12px"><span class="tag">${kindLabel[it.type]}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}</div>
     <h1 class="serif" style="font-size:34px;color:var(--ink);margin:0 0 10px;line-height:1.1">${it.titre}</h1>
     <div class="muted" style="margin-bottom:24px">🎓 ${it.tuteur} · ${it.note!=="—"?"major à "+it.note+"/20":"contenu ajouté"}${it.duree?" · "+it.duree:""}</div>
-    ${media}${state.subscribed&&CONFIG.FUNCTIONS_URL?`<button class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="downloadProtected('${it.id}')">⬇ Télécharger (tatoué à ton compte)</button>`:""}
-    <div style="position:relative;margin-top:28px">${isUpload?`<div class="card" style="padding:22px;color:var(--sub);font-size:15px;line-height:1.6">Ce sujet vient d'être ajouté.${unlocked&&it.outUrl?` <a class="token" href="${it.outUrl}" download="${it.outName}">Télécharger</a>`:""}<br/>La correction vidéo et la méthode seront publiées prochainement.</div>`:sections.map((b,i)=>{const hide=!unlocked&&i>=2;return `<div style="margin-bottom:24px"><div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><span class="serif" style="font-size:18px;color:var(--muted)">${i+1}</span><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0">${labels[i]}</h3>${!isCours&&i===3?'<span class="tag amber">le + utile</span>':""}</div><p style="font-size:15px;color:var(--text);line-height:1.65;margin:0;padding-left:28px;${hide?"filter:blur(5px);user-select:none":""}">${b}</p></div>`;}).join("")}${!isUpload&&!unlocked?`<div style="position:absolute;left:0;right:0;bottom:0;height:200px;background:linear-gradient(to bottom,rgba(251,251,250,0),var(--bg) 78%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:14px"><div style="text-align:center"><div style="font-size:14px;color:var(--sub);margin-bottom:12px">${isCours?"Cours complet réservé aux abonnés":"Méthode, pièges et barème réservés aux abonnés"}</div><button class="btn btn-accent" onclick="setModal(true)">Débloquer</button></div></div>`:""}</div>
+    ${media}${state.subscribed&&CONFIG.FUNCTIONS_URL&&it.file_path?`<button class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="downloadProtected('${it.id}')">⬇ Télécharger (tatoué à ton compte)</button>`:""}
+    <div style="position:relative;margin-top:28px">${isUpload?`<div class="card" style="padding:22px;color:var(--text);font-size:15px;line-height:1.65">${it.description?esc(it.description).replace(/\n/g,"<br/>"):"Contenu ajouté par l'équipe Studia."}${unlocked&&it.outUrl?`<div style="margin-top:14px"><a class="token" href="${it.outUrl}" download="${it.outName}">⬇ Télécharger le sujet</a></div>`:""}</div>`:sections.map((b,i)=>{const hide=!unlocked&&i>=2;return `<div style="margin-bottom:24px"><div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><span class="serif" style="font-size:18px;color:var(--muted)">${i+1}</span><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0">${labels[i]}</h3>${!isCours&&i===3?'<span class="tag amber">le + utile</span>':""}</div><p style="font-size:15px;color:var(--text);line-height:1.65;margin:0;padding-left:28px;${hide?"filter:blur(5px);user-select:none":""}">${b}</p></div>`;}).join("")}${!isUpload&&!unlocked?`<div style="position:absolute;left:0;right:0;bottom:0;height:200px;background:linear-gradient(to bottom,rgba(251,251,250,0),var(--bg) 78%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:14px"><div style="text-align:center"><div style="font-size:14px;color:var(--sub);margin-bottom:12px">${isCours?"Cours complet réservé aux abonnés":"Méthode, pièges et barème réservés aux abonnés"}</div><button class="btn btn-accent" onclick="setModal(true)">Débloquer</button></div></div>`:""}</div>
   </div>`;
 }
 /* ===== Tarifs / Tuteur ===== */
 function Tarifs(){
-  const plans=[{nom:"Découverte",prix:"0",per:"",desc:"Pour tester",feats:["2 contenus gratuits","Aperçu des méthodes","Accès au programme"],cta:"C'est parti",v:"ghost",plan:"free"},{nom:"Pass semestriel",prix:"39",per:"/ semestre",desc:"Calé sur le rythme des partiels",feats:["Accès illimité tout le semestre","Cours + TD + examens corrigés","QCM & partiels blancs","Lives de révision"],cta:"Choisir le semestre",v:"accent",plan:"semestre",reco:true},{nom:"Mensuel",prix:"9",per:"/ mois",desc:"Flexible, sans engagement",feats:["Accès illimité","Tous les contenus corrigés","QCM & partiels blancs","Résiliable à tout moment"],cta:"Prendre au mois",v:"ghost",plan:"mensuel"}];
-  return `<div class="wrap fade" style="padding:54px 0 0;text-align:center"><h1 class="serif" style="font-size:44px;color:var(--ink);margin:0 0 10px">Tarifs</h1><p style="font-size:16px;color:var(--sub);margin:0 auto 42px;max-width:480px">Le pass semestriel suit le vrai rythme de l'année : couvert pour décembre ET pour mai.</p><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;max-width:920px;margin:0 auto;text-align:left">${plans.map(p=>`<div class="card" style="padding:26px;position:relative;${p.reco?"border:1.5px solid var(--accent)":""}">${p.reco?'<div style="position:absolute;top:-11px;left:26px"><span class="pill">Recommandé</span></div>':""}<div style="font-weight:600;color:var(--ink)">${p.nom}</div><div class="muted" style="margin:2px 0 16px;min-height:30px">${p.desc}</div><div style="display:flex;align-items:baseline;gap:4px;margin-bottom:18px"><span class="serif" style="font-size:44px;color:var(--ink)">${p.prix}€</span><span class="muted">${p.per}</span></div><button class="btn btn-${p.v}" style="width:100%;margin-bottom:18px" onclick="${p.plan==="free"?"nav('univs')":`startCheckout('${p.plan}')`}">${p.cta}</button>${p.feats.map(f=>`<div style="display:flex;gap:9px;font-size:14px;color:var(--text);margin-bottom:10px"><span style="color:var(--accent)">✓</span>${f}</div>`).join("")}</div>`).join("")}</div></div>`;
+  const plans=[
+    {nom:"Découverte",prix:"0",per:"",badge:"Gratuit",desc:"Pour découvrir Studia avant de t'abonner.",feats:["2 contenus gratuits","Aperçu des méthodes","Accès au programme complet"],cta:"Commencer gratuitement",v:"ghost",plan:"free"},
+    {nom:"Pass semestriel",prix:"39",per:"€",sub:"pour tout le semestre",badge:"Le + populaire",desc:"Calé sur le rythme des partiels : couvert pour décembre ET pour mai.",feats:["Accès illimité tout le semestre","Cours, TD & examens corrigés","QCM & partiels blancs","Lives de révision avant partiels","Économie de 15 € vs. mensuel"],cta:"Choisir le semestre",v:"accent",plan:"semestre",reco:true},
+    {nom:"Mensuel",prix:"9",per:"€",sub:"par mois",badge:"Flexible",desc:"Sans engagement, résiliable à tout moment.",feats:["Accès illimité","Tous les contenus corrigés","QCM & partiels blancs","Résiliable en 1 clic"],cta:"Prendre au mois",v:"ghost",plan:"mensuel"}
+  ];
+  return `<div class="wrap fade" style="padding:54px 0 0">
+    <div style="text-align:center;margin-bottom:44px">
+      <span class="pill">Tarifs étudiants</span>
+      <h1 class="serif" style="font-size:46px;color:var(--ink);margin:14px 0 12px">Choisis ton accès.</h1>
+      <p style="font-size:16px;color:var(--sub);margin:0 auto;max-width:520px;line-height:1.55">Un prix juste, pensé pour le budget étudiant. Pas d'engagement caché — change ou résilie quand tu veux.</p>
+    </div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;max-width:960px;margin:0 auto;align-items:stretch">
+    ${plans.map(p=>`
+      <div class="card" style="padding:28px 24px;position:relative;display:flex;flex-direction:column;${p.reco?"border:1.5px solid var(--accent);box-shadow:0 8px 24px rgba(52,199,89,.12);transform:translateY(-4px)":""}">
+        ${p.reco?'<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%)"><span class="pill" style="background:var(--accent);color:#fff;font-weight:600;padding:5px 12px">★ Recommandé</span></div>':""}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-weight:600;color:var(--ink);font-size:17px">${p.nom}</div>
+          <span class="tag">${p.badge}</span>
+        </div>
+        <div class="muted" style="margin:0 0 22px;line-height:1.5;min-height:42px">${p.desc}</div>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px">
+          <span class="serif" style="font-size:52px;color:var(--ink);line-height:1">${p.prix}</span>
+          <span style="font-size:22px;color:var(--ink);font-weight:500">${p.per||""}</span>
+        </div>
+        <div class="muted" style="margin-bottom:22px;min-height:18px">${p.sub||"&nbsp;"}</div>
+        <button class="btn btn-${p.v}" style="width:100%;margin-bottom:22px" onclick="${p.plan==="free"?"nav('univs')":`startCheckout('${p.plan}')`}">${p.cta}</button>
+        <div style="border-top:1px solid var(--border);padding-top:18px;flex:1">
+          ${p.feats.map(f=>`<div style="display:flex;gap:10px;font-size:14px;color:var(--text);margin-bottom:11px;line-height:1.45"><span style="color:var(--accent);flex-shrink:0">✓</span><span>${f}</span></div>`).join("")}
+        </div>
+      </div>`).join("")}
+    </div>
+    <div style="text-align:center;margin-top:36px;font-size:13px;color:var(--muted)">Paiement sécurisé · Sans engagement · Annulation en 1 clic</div>
+  </div>`;
 }
 
 function Tuteur(){
   const cr=[["Note ≥ 16/20","Tu dois avoir cartonné dans la matière."],["Correction-test validée","Relue par l'équipe avant publication."],["Contenu 100 % original","Tes propres cours et corrigés — jamais ceux d'un prof."]];
-  return `<div class="wrap fade" style="padding:54px 0 0"><div style="max-width:640px"><span class="pill">Rejoins l'équipe</span><h1 class="serif" style="font-size:46px;color:var(--ink);margin:18px 0 16px;line-height:1.05">Aide ta promo. Gagne de l'argent. Muscle ton CV.</h1><p style="font-size:17px;color:var(--sub);line-height:1.6;margin:0 0 32px">Tu as excellé ? Transmets ta méthode. Rémunéré sur chaque contenu publié, et une vraie ligne d'expérience.</p></div><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:32px">${cr.map(([t,d],i)=>`<div class="card" style="padding:22px"><div class="serif" style="font-size:24px;color:var(--accent);margin-bottom:8px">0${i+1}</div><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0 0 6px">${t}</h3><p style="font-size:14px;color:var(--sub);line-height:1.55;margin:0">${d}</p></div>`).join("")}</div><div class="note" style="max-width:720px">⚠️ <div><b>Charte tuteur.</b> Chaque tuteur certifie que son contenu est original et ne reproduit aucun support de cours d'un enseignant. Règle non négociable — et notre protection.</div></div></div>`;
+  return `<div class="wrap fade" style="padding:54px 0 0"><div style="max-width:640px"><span class="pill">Rejoins l'équipe</span><h1 class="serif" style="font-size:46px;color:var(--ink);margin:18px 0 16px;line-height:1.05">Aide ta promo, gagne de l'argent, muscle ton CV.</h1><p style="font-size:17px;color:var(--sub);line-height:1.6;margin:0 0 32px">Tu as excellé ? Transmets ta méthode. Rémunéré sur chaque contenu publié, et une vraie ligne d'expérience.</p></div><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:32px">${cr.map(([t,d],i)=>`<div class="card" style="padding:22px"><div class="serif" style="font-size:24px;color:var(--accentDark);margin-bottom:8px">0${i+1}</div><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0 0 6px">${t}</h3><p style="font-size:14px;color:var(--sub);line-height:1.55;margin:0">${d}</p></div>`).join("")}</div><div class="note" style="max-width:720px">⚠️ <div><b>Charte tuteur.</b> Chaque tuteur certifie que son contenu est original et ne reproduit aucun support de cours d'un enseignant. Règle non négociable — et notre protection.</div></div></div>`;
 }
 /* ===== Login ===== */
 function LoginView(){
@@ -437,17 +533,17 @@ function LoginView(){
     </div>
     ${signup?`<div style="margin-bottom:12px"><input class="input" id="authName" placeholder="Nom complet"/></div>`:""}
     <div style="margin-bottom:12px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username"/></div>
-    <div style="margin-bottom:12px"><input class="input" id="authPass" type="password" placeholder="Mot de passe" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()"/></div>
+    <div style="margin-bottom:12px"><input class="input" id="authPass" type="password" placeholder="Mot de passe (6+ caractères)" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()"/></div>
     <button class="btn btn-ink" style="width:100%" onclick="doAuth()">${signup?"Créer mon compte":"Se connecter"}</button>
     <div id="authErr" style="color:#B4453A;font-size:13px;min-height:18px;margin-top:8px"></div>
     <div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span class="muted">ou</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
     <button class="btn btn-ghost" style="width:100%" onclick="googleAuth()">Continuer avec Google</button>
-    <p class="muted" style="margin-top:16px">Espace gestion (admin) : connecte-toi avec <b>djad</b> / <b>studia-admin</b>.</p>
+    <p class="muted" style="margin-top:16px">Espace admin : connecte-toi avec l'email <b>${ADMIN_EMAIL}</b>.</p>
   </div></div>`;
 }
 /* ===== Footer ===== */
 function Footer(){
-  return `<div style="border-top:1px solid var(--border);margin-top:80px;background:var(--surface)"><div class="wrap" style="padding:36px 0;display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between"><div style="max-width:340px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><div class="logo" style="width:22px;height:22px;font-size:14px">S</div><span style="font-weight:600;color:var(--ink)">Studia</span></div><p class="muted" style="line-height:1.6;margin:0">Plateforme indépendante d'entraide entre étudiants. Non affiliée aux établissements. Contenus originaux produits par nos tuteurs.</p></div><div style="font-size:13px;color:var(--sub);line-height:2"><div style="font-weight:500;color:var(--text);margin-bottom:4px">Liens</div><div>Programme</div><div>Tarifs</div><div>Devenir tuteur</div><div>CGU · Confidentialité</div></div></div></div>`;
+  return `<div style="border-top:1px solid var(--border);margin-top:80px;background:var(--surface)"><div class="wrap" style="padding:36px 0;display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between"><div style="max-width:340px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><div class="logo" style="width:22px;height:22px;font-size:13px">S</div><span style="font-weight:600;color:var(--ink)">Studia</span></div><p class="muted" style="line-height:1.6;margin:0">Plateforme indépendante d'entraide entre étudiants. Non affiliée aux établissements. Contenus originaux produits par nos tuteurs.</p></div><div style="font-size:13px;color:var(--sub);line-height:2"><div style="font-weight:500;color:var(--text);margin-bottom:4px">Liens</div><div>Programme</div><div>Tarifs</div><div>Devenir tuteur</div><div>CGU · Confidentialité</div></div></div></div>`;
 }
 
 /* ===== ADMIN CONSOLE (drill-down) ===== */
@@ -458,14 +554,10 @@ function aPickFac(fid){state.a.fac=facById(state.a.univ.id,fid);state.a.view="ni
 function aPickNiv(n){state.a.niv=n;state.a.view="mat";render();}
 function aPickMat(idx){const m=matieresFor(state.a.univ.id,state.a.fac.id,state.a.niv)[idx];if(m==null)return;state.a.mat=m;state.a.tab="Cours";state.a.view="manage";render();}
 function promptAddMatiere(){
-  const nom = prompt("Nom de la nouvelle matière :");
-  if(nom && nom.trim()){
-    const f = facById(state.a.univ.id, state.a.fac.id);
-    if(f) {
-      if(!f.mat[state.a.niv]) f.mat[state.a.niv] = [];
-      f.mat[state.a.niv].push(nom.trim());
-      render();
-    }
+  const nom=prompt("Nom de la nouvelle matière :");
+  if(nom&&nom.trim()){
+    const f=facById(state.a.univ.id,state.a.fac.id);
+    if(f){if(!f.mat[state.a.niv])f.mat[state.a.niv]=[];f.mat[state.a.niv].push(nom.trim());render();}
   }
 }
 function aCrumb(){
@@ -480,15 +572,15 @@ function AdminConsole(){
   const a=state.a;
   let body;
   if(a.view==="univ"){
-    body=`<h2 class="serif" style="font-size:30px;color:var(--ink);margin:0 0 6px">Console admin</h2><p class="muted" style="margin:0 0 24px">Descends dans la structure pour gérer un catalogue précis.</p>
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${UNIVS.map(u=>`<div class="card ${u.actif?"card-h":""}" style="padding:22px;${u.actif?"":"opacity:.55"}" ${u.actif?`onclick="aPickUniv('${u.id}')"`:""}><div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px"><div class="logo" style="background:${u.actif?"var(--ink)":"#D9D8D4"}">${u.nom[0]}</div>${u.actif?'<span class="pill">Disponible</span>':'<span class="tag">Bientôt</span>'}</div><div style="font-weight:600;color:var(--ink);font-size:15px">${u.nom}</div><div class="muted">${u.ville}</div></div>`).join("")}</div>`;
+    body=`<h2 class="serif" style="font-size:30px;color:var(--ink);margin:0 0 6px">Console admin</h2><p class="muted" style="margin:0 0 24px">Descends dans la structure pour gérer un catalogue précis. Université ▸ filière ▸ niveau ▸ matière.</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${UNIVS.map(u=>`<div class="card ${u.actif?"card-h":""}" style="padding:22px;${u.actif?"":"opacity:.55"}" ${u.actif?`onclick="aPickUniv('${u.id}')"`:""}><div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">${univLogoHTML(u)}${u.actif?'<span class="pill">Disponible</span>':'<span class="tag">Bientôt</span>'}</div><div style="font-weight:600;color:var(--ink);font-size:15px">${u.nom}</div><div class="muted">${u.ville}</div></div>`).join("")}</div>`;
   } else if(a.view==="fac"){
     body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.univ.nom}</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${a.univ.facultes.map(f=>`<div class="card card-h" style="padding:24px" onclick="aPickFac('${f.id}')"><h3 style="font-size:18px;color:var(--ink);font-weight:600;margin:0 0 6px">${f.nom}</h3><div class="muted">${state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===f.id).length} contenus</div></div>`).join("")}</div>`;
   } else if(a.view==="niv"){
     body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom}</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">${["L1","L2","L3"].map(n=>`<div class="card card-h" style="padding:24px;text-align:center" onclick="aPickNiv('${n}')"><div class="serif" style="font-size:32px;color:var(--ink)">${n}</div><div class="muted">${state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===a.fac.id&&c.annee===n).length} contenus</div></div>`).join("")}</div>`;
   } else if(a.view==="mat"){
     const mats=matieresFor(a.univ.id,a.fac.id,a.niv);
-    body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom} · ${a.niv}</h2><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${mats.map((m,i)=>`<div class="card card-h" style="padding:20px" onclick="aPickMat(${i})"><div style="display:flex;justify-content:space-between"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0">${m}</h3><span style="color:var(--muted)">›</span></div><div class="muted" style="margin-top:8px">${TYPES.map(t=>countMat(a.univ.id,a.fac.id,a.niv,m,t)).reduce((x,y)=>x+y,0)} contenus</div></div>`).join("")}<div class="card card-h" style="padding:20px;display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--borderStrong);background:transparent;cursor:pointer" onclick="promptAddMatiere()"><span style="color:var(--accent);font-weight:500">+ Ajouter une matière</span></div></div>`;
+    body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom} · ${a.niv}</h2><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${mats.map((m,i)=>`<div class="card card-h" style="padding:20px" onclick="aPickMat(${i})"><div style="display:flex;justify-content:space-between"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0">${m}</h3><span style="color:var(--muted)">›</span></div><div class="muted" style="margin-top:8px">${TYPES.map(t=>countMat(a.univ.id,a.fac.id,a.niv,m,t)).reduce((x,y)=>x+y,0)} contenus</div></div>`).join("")}<div class="card card-h" style="padding:20px;display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--borderStrong);background:transparent;cursor:pointer" onclick="promptAddMatiere()"><span style="color:var(--accentDark);font-weight:500">+ Ajouter une matière</span></div></div>`;
   } else {
     body=AdminManage();
   }
@@ -507,8 +599,8 @@ function AdminManage(){
       <div class="card" style="padding:20px">
         <div class="muted" style="margin-bottom:4px">Upload dans</div>
         <div style="font-weight:600;color:var(--ink);font-size:15px;margin-bottom:2px">${a.mat}</div>
-        <div class="muted" style="margin-bottom:14px">${a.univ.ville} · ${a.fac.nom} · ${a.niv} · <b style="color:var(--accent)">${kindLabel[a.tab]}</b></div>
-        <div class="dz" id="dz"><strong>Dépose un fichier</strong><br/>il sera rangé ici<input type="file" id="fi" accept="image/*,application/pdf" multiple style="display:none"/></div>
+        <div class="muted" style="margin-bottom:14px">${a.univ.ville} · ${a.fac.nom} · ${a.niv} · <b style="color:var(--accentDark)">${kindLabel[a.tab]}</b></div>
+        <div class="dz" id="dz"><strong>Dépose un fichier PDF / image</strong><br/><span style="font-size:12px">stocké dans le bucket privé + tatoué</span><input type="file" id="fi" accept="image/*,application/pdf" multiple style="display:none"/></div>
       </div>
       <div class="card" style="padding:20px;margin-top:14px">
         <h3 style="font-size:15px;color:var(--ink);font-weight:600;margin:0 0 12px">Placement du QR</h3>
@@ -534,41 +626,70 @@ function AdminManage(){
     </div>
     <div>
       <div class="tabs">${TYPES.map(t=>`<button class="${a.tab===t?"on":""}" onclick="aSet('tab','${t}')">${kindLabel[t]} <span style="color:var(--muted);font-weight:400">${countMat(a.univ.id,a.fac.id,a.niv,a.mat,t)}</span></button>`).join("")}</div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div class="muted">${list.length} élément${list.length>1?"s":""}</div>
-        <div class="seg sm">${[["recent","Récents"],["az","A-Z"]].map(([s,l])=>`<button class="${a.sort===s?"on":""}" onclick="aSet('sort','${s}')">${l}</button>`).join("")}</div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap"><div class="muted">${list.length} élément${list.length>1?"s":""}</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-accent btn-sm" onclick="openNewContenu()">+ Nouveau contenu</button>
+          <div class="seg sm">${[["recent","Récents"],["az","A-Z"]].map(([s,l])=>`<button class="${a.sort===s?"on":""}" onclick="aSet('sort','${s}')">${l}</button>`).join("")}</div>
+        </div>
+      </div>
       <div id="aList">${adminListHTML(list)}</div>
     </div>
   </div>`;
 }
 function adminListHTML(list){
-  if(!list.length)return `<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Rien ici. Uploade un fichier ou ajoute du contenu.</div>`;
-  return list.map(c=>{const up=c.source==="upload";
-    return `<div class="card row" style="align-items:flex-start">
-      <div class="thumb">${c.thumb?`<img src="${c.thumb}"/>`:(up?"PDF":kindIcon[c.type])}</div>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><span class="tag">${up?"UPLOAD":"Catalogue"}</span>${up&&c.date?`<span class="tag">${c.date}</span>`:""}</div>
-        <input class="input" style="padding:7px 10px;font-size:13px;margin-bottom:8px" value="${esc(c.titre)}" oninput="updField('${c.id}','titre',this.value)"/>
-        ${up?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${c.qr?`<div class="qrmini"><img src="${c.qr}"/></div>`:`<div class="qrmini"></div>`}${c.token?`<span class="token">${c.token}</span>`:'<span class="muted">génération…</span>'}${c.outUrl?`<a class="btn btn-ink btn-sm" href="${c.outUrl}" download="${c.outName}">Télécharger (tatoué)</a>`:""}<button class="btn btn-ghost btn-sm" onclick="regen('${c.id}')">Régénérer</button><button class="btn btn-ghost btn-sm" onclick="delItem('${c.id}')">Supprimer</button></div>${c.error?`<div style="color:#B4453A;font-size:13px;margin-top:6px">${c.error}</div>`:""}`:`<div class="muted">${c.tuteur} · ${c.note}/20 · ${c.duree||""}</div>`}
-      </div></div>`;
+  if(!list.length)return `<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Rien ici. Crée un nouveau contenu, dépose un fichier, ou colle une URL vidéo.</div>`;
+  return list.map(c=>{
+    const up=c.source==="upload", isSeed=c.source==="seed";
+    const v=parseVideoEmbed(c.video_url);
+    return `<div class="card" style="padding:16px;margin-bottom:10px">
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <div class="thumb">${c.thumb?`<img src="${c.thumb}"/>`:(v&&v.thumb?`<img src="${v.thumb}"/>`:(up?"PDF":kindIcon[c.type]))}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <span class="tag">${isSeed?"Catalogue":(c.file_path?"FICHIER":"VIDÉO")}</span>
+            ${c.date?`<span class="tag">${c.date}</span>`:""}
+            ${v?`<span class="pill">▶ ${v.kind}</span>`:""}
+            ${c.gratuit?'<span class="pill">Gratuit</span>':""}
+          </div>
+          <input class="input" style="padding:7px 10px;font-size:13.5px;font-weight:500;margin-bottom:8px" value="${esc(c.titre)}" oninput="updField('${c.id}','titre',this.value)" placeholder="Titre du contenu"/>
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:8px">
+            <input class="input" style="padding:7px 10px;font-size:12.5px" value="${esc(c.tuteur||'')}" oninput="updField('${c.id}','tuteur',this.value)" placeholder="Tuteur"/>
+            <input class="input" style="padding:7px 10px;font-size:12.5px" value="${esc(c.note||'')}" oninput="updField('${c.id}','note',this.value)" placeholder="Note/20"/>
+            <input class="input" style="padding:7px 10px;font-size:12.5px" value="${esc(c.duree||'')}" oninput="updField('${c.id}','duree',this.value)" placeholder="Durée"/>
+          </div>
+          <input class="input" style="padding:7px 10px;font-size:12.5px;margin-bottom:8px" value="${esc(c.video_url||'')}" oninput="updField('${c.id}','video_url',this.value)" placeholder="URL vidéo YouTube / Vimeo (optionnel)"/>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--sub);cursor:pointer"><input type="checkbox" ${c.gratuit?"checked":""} onchange="updField('${c.id}','gratuit',this.checked)"/>Gratuit (sans abonnement)</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${up&&c.outUrl?`<a class="btn btn-ink btn-sm" href="${c.outUrl}" download="${c.outName}">⬇ Tatoué</a>`:""}
+              ${up&&c.file?`<button class="btn btn-ghost btn-sm" onclick="regen('${c.id}')">Régénérer QR</button>`:""}
+              <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="delItem('${c.id}')">Supprimer</button>
+            </div>
+          </div>
+          ${up&&c.token?`<div style="display:flex;gap:8px;align-items:center;margin-top:8px">${c.qr?`<div class="qrmini"><img src="${c.qr}"/></div>`:`<div class="qrmini"></div>`}<span class="token">${c.token}</span></div>`:""}
+          ${c.error?`<div style="color:#B4453A;font-size:13px;margin-top:6px">${c.error}</div>`:""}
+        </div>
+      </div>
+    </div>`;
   }).join("");
 }
 function aRefreshList(){const el=document.getElementById("aList");if(!el)return;const a=state.a;let list=itemsFor(a.univ.id,a.fac.id,a.niv,a.mat,a.tab).slice();if(a.sort==="recent")list.sort((x,y)=>(y.ts||0)-(x.ts||0));else if(a.sort==="az")list.sort((x,y)=>x.titre.localeCompare(y.titre));el.innerHTML=adminListHTML(list);}
-function updField(id,k,v){const c=state.contenus.find(x=>x.id===id);if(c)c[k]=v;}
+
+const _updTimers={};
+function updField(id,k,v){
+  const c=state.contenus.find(x=>x.id===id);if(!c)return;c[k]=v;
+  if(c.source==="seed")return;
+  if(_updTimers[id+k])clearTimeout(_updTimers[id+k]);
+  _updTimers[id+k]=setTimeout(()=>{dbUpdateContenu(id,{[k]:v});},600);
+}
 async function delItem(id){
-  // --- NOUVEAU : Suppression sur Supabase ---
-  if(sb){
-    const c = state.contenus.find(x => x.id === id);
-    if(c && c.source === "upload") {
-      const fileName = c.id + (c.kind === "pdf" ? ".pdf" : ".png");
-      await sb.storage.from("sujets").remove([fileName]);
-    }
-    await sb.from("contenus").delete().eq("id", id);
-  }
-  // ------------------------------------------
-  
-  state.contenus=state.contenus.filter(c=>c.id!==id);
+  const c=state.contenus.find(x=>x.id===id);
+  if(!confirm("Supprimer ce contenu ? Cette action est définitive."))return;
+  if(c&&c.source!=="seed")await dbDeleteContenu(id,c.file_path);
+  state.contenus=state.contenus.filter(x=>x.id!==id);
   render();
 }
+
 function bindAdmin(){
   const dz=document.getElementById("dz"),fi=document.getElementById("fi");
   if(dz&&fi){dz.onclick=()=>fi.click();fi.onchange=()=>{if(fi.files.length)handleFiles([...fi.files]);fi.value="";};
@@ -624,31 +745,22 @@ async function handleFiles(files){
     const kind=file.type==="application/pdf"?"pdf":(file.type.startsWith("image/")?"image":null);if(!kind)continue;
     const c={id:genId(),source:"upload",kind,file,
       univ:a.univ.id,faculte:a.fac.id,annee:a.niv,matiere:a.mat,type:a.tab,
-      account:ACCOUNT,email:ADMIN_EMAIL,date:today(),ts:Date.now(),
-      titre:file.name,tuteur:"—",note:"—",duree:"",gratuit:false,qr:null,outUrl:null,thumb:null,error:null};
+      account:ACCOUNT,email:(state.user&&state.user.email)||ADMIN_EMAIL,date:today(),ts:Date.now(),
+      titre:file.name,tuteur:"—",note:"—",duree:"",gratuit:false,qr:null,outUrl:null,thumb:null,error:null,
+      file_path:null,video_url:null,description:null};
     if(kind==="image")c.thumb=await fileToDataURL(file);
-
-    // --- NOUVEAU : Sauvegarde sur Supabase ---
-    if(sb){
-      const fileName = c.id + (kind === "pdf" ? ".pdf" : ".png");
-      // 1. Upload dans le bucket Storage privé
-      await sb.storage.from("sujets").upload(fileName, file);
-      
-      // 2. Création de la ligne dans la base de données
-      await sb.from("contenus").insert([{
-        id: c.id, source: c.source, univ: c.univ, faculte: c.faculte, annee: c.annee,
-        matiere: c.matiere, type: c.type, titre: c.titre, tuteur: c.tuteur,
-        note: c.note, duree: c.duree, gratuit: c.gratuit, account: c.account,
-        email: c.email, date: c.date, ts: c.ts, file_path: fileName
-      }]);
-    }
-    // ------------------------------------------
-
     state.contenus.push(c);render();
-    await processRecord(c);render();
+    await processRecord(c);
+    // Upload original vers Storage + insert ligne en base
+    const path=await dbUploadFile(file,c.id);
+    if(path)c.file_path=path;
+    const r=await dbInsertContenu(c);
+    if(!r.ok&&!r.offline)c.error=(c.error||"")+" (DB: "+(r.error||"erreur")+")";
+    render();
   }
 }
 async function regen(id){const c=state.contenus.find(x=>x.id===id);if(!c)return;c.outUrl=null;c.qr=null;render();await processRecord(c);render();}
+
 var scanStream=null, scanRAF=null;
 function resolveToken(str){
   const out=document.getElementById("to"); if(!out)return;
@@ -699,8 +811,64 @@ function stopScan(){
   const s=document.getElementById("scanStart"),st=document.getElementById("scanStop");if(s)s.style.display="inline-flex";if(st)st.style.display="none";
 }
 
-/* ===== modal ===== */
-function renderModal(){const r=document.getElementById("modalRoot");if(!state.modal){r.innerHTML="";return;}
+/* ===== Modal "Nouveau contenu" ===== */
+function openNewContenu(){state.newC={open:true};renderNewContenu();}
+function closeNewContenu(){state.newC={open:false};renderNewContenu();}
+async function saveNewContenu(){
+  const a=state.a;
+  const get=id=>(document.getElementById(id)||{}).value||"";
+  const titre=get("ncTitre").trim();
+  if(!titre){alert("Titre requis.");return;}
+  const c={
+    id:genId(),source:"upload",
+    univ:a.univ.id,faculte:a.fac.id,annee:a.niv,matiere:a.mat,
+    type:get("ncType")||a.tab,
+    titre,tuteur:get("ncTuteur")||"—",note:get("ncNote")||"—",duree:get("ncDuree")||"",
+    video_url:get("ncVideo").trim()||null,
+    description:get("ncDesc").trim()||null,
+    gratuit:document.getElementById("ncGratuit").checked,
+    account:ACCOUNT,email:(state.user&&state.user.email)||ADMIN_EMAIL,
+    date:today(),ts:Date.now(),
+    file_path:null,qr:null,outUrl:null,thumb:null,error:null
+  };
+  state.contenus.push(c);
+  const r=await dbInsertContenu(c);
+  if(!r.ok&&!r.offline){alert("Sauvegarde DB échouée : "+(r.error||"erreur"));}
+  closeNewContenu();render();
+}
+function renderNewContenu(){
+  const r=document.getElementById("modalRoot");
+  if(!state.newC||!state.newC.open){if(!state.modal)r.innerHTML="";return;}
+  const a=state.a;
+  r.innerHTML=`<div class="modal-bg" onclick="closeNewContenu()"><div class="modal fade" onclick="event.stopPropagation()" style="max-width:480px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 class="serif" style="font-size:22px;color:var(--ink);margin:0">Nouveau contenu</h3><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px" onclick="closeNewContenu()">✕</button></div>
+    <div class="muted" style="margin-bottom:14px">${a.univ.ville} · ${a.fac.nom} · ${a.niv} · <b style="color:var(--accentDark)">${a.mat}</b></div>
+    <div style="display:grid;gap:10px">
+      <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Type</label>
+        <select class="input" id="ncType">${TYPES.map(t=>`<option value="${t}" ${a.tab===t?"selected":""}>${kindLabel[t]}</option>`).join("")}</select></div>
+      <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Titre *</label>
+        <input class="input" id="ncTitre" placeholder="Ex. Maximisation de l'utilité sous contrainte"/></div>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px">
+        <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Tuteur</label><input class="input" id="ncTuteur" placeholder="Léa M."/></div>
+        <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Note /20</label><input class="input" id="ncNote" placeholder="18"/></div>
+        <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Durée</label><input class="input" id="ncDuree" placeholder="12 min"/></div>
+      </div>
+      <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">URL vidéo (YouTube / Vimeo)</label>
+        <input class="input" id="ncVideo" placeholder="https://www.youtube.com/watch?v=..."/></div>
+      <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Description (optionnel)</label>
+        <textarea class="input" id="ncDesc" rows="3" style="resize:vertical;font-family:inherit" placeholder="Courte intro du contenu, ce qu'on y apprend…"></textarea></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);cursor:pointer;padding:8px 0"><input type="checkbox" id="ncGratuit"/>Gratuit (accessible sans abonnement)</label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeNewContenu()">Annuler</button>
+      <button class="btn btn-accent" style="flex:1" onclick="saveNewContenu()">Créer</button>
+    </div>
+    <p class="muted" style="margin-top:10px;font-size:11.5px">Tu peux aussi déposer un PDF/image dans la zone à gauche : il sera tatoué et stocké dans le bucket privé.</p>
+  </div></div>`;
+}
+
+/* ===== modal abonnement ===== */
+function renderModal(){const r=document.getElementById("modalRoot");if(!state.modal){if(!state.newC||!state.newC.open)r.innerHTML="";return;}
   const hasStripe=CONFIG.STRIPE_LINK_MENSUEL||CONFIG.STRIPE_LINK_SEMESTRE;
   r.innerHTML=`<div class="modal-bg" onclick="setModal(false)"><div class="modal fade" onclick="event.stopPropagation()"><div style="display:flex;justify-content:space-between"><span style="color:var(--accent)">✦</span><button style="background:none;border:none;color:var(--muted);cursor:pointer" onclick="setModal(false)">✕</button></div><h3 class="serif" style="font-size:26px;color:var(--ink);margin:12px 0 6px">Débloque tout Studia</h3><p style="font-size:14px;color:var(--sub);margin:0 0 18px;line-height:1.5">Accès illimité aux cours, TD et examens corrigés.</p><button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="startCheckout('semestre')">Pass semestriel — 39€</button><button class="btn btn-ghost" style="width:100%;margin-bottom:14px" onclick="startCheckout('mensuel')">Mensuel — 9€/mois</button>${hasStripe?'<p class="muted" style="text-align:center;margin:0">Paiement sécurisé via Stripe.</p>':`<div style="border-top:1px solid var(--border);padding-top:12px"><button class="btn btn-ink btn-sm" style="width:100%" onclick="subscribe()">Activer l'accès (démo)</button><p class="muted" style="text-align:center;margin-top:8px">Stripe non configuré — bouton démo.</p></div>`}</div></div>`;
 }
