@@ -191,7 +191,7 @@ const coursTpl=t=>[`Le cœur de « ${t} » résumé sans remplissage.`,"Les conc
 /* ===== derived ===== */
 const univById=id=>UNIVS.find(u=>u.id===id);
 const facById=(uid,fid)=>{const u=univById(uid);return u&&u.facultes.find(f=>f.id===fid);};
-const matieresFor=(uid,fid,annee)=>[...new Set(state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee).map(c=>c.matiere))];
+const matieresFor=(uid,fid,annee)=>{const f=facById(uid,fid);const m1=(f&&f.mat&&f.mat[annee])?f.mat[annee]:[];const m2=state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee).map(c=>c.matiere);return[...new Set([...m1,...m2])]};
 const countMat=(uid,fid,annee,m,type)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type).length;
 const itemsFor=(uid,fid,annee,m,type)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type);
 const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
@@ -457,6 +457,17 @@ function aPickUniv(id){const u=univById(id);if(!u||!u.actif)return;state.a.univ=
 function aPickFac(fid){state.a.fac=facById(state.a.univ.id,fid);state.a.view="niv";render();}
 function aPickNiv(n){state.a.niv=n;state.a.view="mat";render();}
 function aPickMat(idx){const m=matieresFor(state.a.univ.id,state.a.fac.id,state.a.niv)[idx];if(m==null)return;state.a.mat=m;state.a.tab="Cours";state.a.view="manage";render();}
+function promptAddMatiere(){
+  const nom = prompt("Nom de la nouvelle matière :");
+  if(nom && nom.trim()){
+    const f = facById(state.a.univ.id, state.a.fac.id);
+    if(f) {
+      if(!f.mat[state.a.niv]) f.mat[state.a.niv] = [];
+      f.mat[state.a.niv].push(nom.trim());
+      render();
+    }
+  }
+}
 function aCrumb(){
   const a=state.a, parts=[["Console",`aGo('univ')`]];
   if(a.univ)parts.push([a.univ.ville,`aGo('fac')`]);
@@ -476,8 +487,9 @@ function AdminConsole(){
   } else if(a.view==="niv"){
     body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom}</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">${["L1","L2","L3"].map(n=>`<div class="card card-h" style="padding:24px;text-align:center" onclick="aPickNiv('${n}')"><div class="serif" style="font-size:32px;color:var(--ink)">${n}</div><div class="muted">${state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===a.fac.id&&c.annee===n).length} contenus</div></div>`).join("")}</div>`;
   } else if(a.view==="mat"){
-    const mats=matieresFor(a.univ.id,a.fac.id,a.niv);
-    body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom} · ${a.niv}</h2><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${mats.map((m,i)=>`<div class="card card-h" style="padding:20px" onclick="aPickMat(${i})"><div style="display:flex;justify-content:space-between"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0">${m}</h3><span style="color:var(--muted)">›</span></div><div class="muted" style="margin-top:8px">${TYPES.map(t=>countMat(a.univ.id,a.fac.id,a.niv,m,t)).reduce((x,y)=>x+y,0)} contenus</div></div>`).join("")}</div>`;
+   const mats=matieresFor(a.univ.id,a.fac.id,a.niv);
+   body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom} · ${a.niv}</h2><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${mats.map((m,i)=>`<div class="card card-h" style="padding:20px" onclick="aPickMat(${i})"><div style="display:flex;justify-content:space-between"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0">${m}</h3><span style="color:var(--muted)">›</span></div><div class="muted" style="margin-top:8px">${TYPES.map(t=>countMat(a.univ.id,a.fac.id,a.niv,m,t)).reduce((x,y)=>x+y,0)} contenus</div></div>`).join("")}<div class="card card-h" style="padding:20px;display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--borderStrong);background:transparent;cursor:pointer" onclick="promptAddMatiere()"><span style="color:var(--accent);font-weight:500">+ Ajouter une matière</span></div></div>`;
+ } else { body=AdminManage(); }
   } else { body=AdminManage(); }
   return `<div class="wrap fade" style="padding:24px 0 0">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">${aCrumb()}<button class="btn btn-ghost btn-sm" onclick="nav('landing')">Voir le site</button></div>
