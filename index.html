@@ -139,8 +139,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .founder{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px;transition:all .35s cubic-bezier(.2,.7,.2,1);overflow:hidden;cursor:pointer}
 .founder:hover{border-color:var(--accent);transform:translateY(-5px);box-shadow:0 14px 36px rgba(52,199,89,.15)}
 .founder-top{display:flex;gap:18px;align-items:center}
-.founder-avatar{width:78px;height:78px;border-radius:50%;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--sans);font-weight:700;font-size:26px;letter-spacing:-1px;flex-shrink:0;box-shadow:0 4px 14px rgba(30,140,60,.25);overflow:hidden}
-.founder-avatar img{width:100%;height:100%;object-fit:cover}
+.founder-avatar{width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--sans);font-weight:700;font-size:30px;letter-spacing:-1px;flex-shrink:0;box-shadow:0 8px 22px rgba(30,140,60,.32);padding:5px;position:relative}
+.founder-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;border:2px solid #fff;background:linear-gradient(135deg,#5BD974,#1E8C3C);display:block}
 .founder-id h3{font-family:var(--serif);font-size:24px;color:var(--ink);margin:0 0 4px;line-height:1.1}
 .founder-role{font-size:13px;color:var(--accentDark);font-weight:600;letter-spacing:.3px;text-transform:uppercase}
 .founder-bio{font-size:14.5px;color:var(--sub);line-height:1.6;max-height:0;overflow:hidden;transition:max-height .5s cubic-bezier(.2,.7,.2,1),opacity .3s ease,margin-top .3s ease;opacity:0;margin-top:0}
@@ -180,11 +180,17 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* Détail contenu — players & commentaires */
 .player-wrap{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:16/9}
 .player-wrap iframe,.player-wrap video,.player-wrap embed{width:100%;height:100%;border:0;display:block}
-.pdf-wrap{position:relative;border-radius:14px;overflow:hidden;background:#F4F3EE;border:1px solid var(--border);height:80vh;min-height:520px;max-height:920px}
+.pdf-wrap{position:relative;border-radius:14px;overflow:hidden;background:#F4F3EE;border:1px solid var(--border);transition:height .3s ease}
 .pdf-wrap iframe,.pdf-wrap embed{width:100%;height:100%;border:0;display:block}
+.pdf-wrap.size-compact{height:60vh;min-height:380px}
+.pdf-wrap.size-normal{height:82vh;min-height:520px}
+.pdf-wrap.size-large{height:96vh;min-height:680px}
 .pdf-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:13px;background:var(--bg)}
-.watermark-overlay{position:absolute;inset:0;pointer-events:none;z-index:2;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(5,1fr);align-items:center;justify-items:center;opacity:.18;user-select:none}
-.watermark-overlay span{color:var(--ink);font-family:var(--sans);font-weight:600;font-size:13px;transform:rotate(-22deg);white-space:nowrap}
+.size-controls{display:inline-flex;background:#F2F1EE;border-radius:8px;padding:3px;gap:2px;margin-left:auto}
+.size-controls button{border:none;background:transparent;font-size:12px;font-weight:500;padding:5px 10px;border-radius:6px;color:var(--sub);cursor:pointer}
+.size-controls button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.media-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12px;color:var(--sub)}
+.user-watermark{position:absolute;bottom:8px;right:8px;z-index:3;font-size:11px;color:rgba(0,0,0,.4);background:rgba(255,255,255,.7);padding:3px 8px;border-radius:6px;pointer-events:none;font-weight:500;backdrop-filter:blur(4px)}
 .no-screenshot{user-select:none;-webkit-user-select:none}
 .hidden-on-blur{transition:filter .15s ease}
 body.hide-content .hidden-on-blur{filter:blur(28px) saturate(0)}
@@ -247,7 +253,35 @@ function setDbStatus(on,text){
   if(t)t.textContent=text||(on?"Connecté à Supabase":"Hors ligne");
 }
 function showDbStatus(show){const el=document.getElementById("dbStatus");if(el){if(show)el.classList.add("show");else el.classList.remove("show");}}
-async function loadContenus(){if(!sb)return;try{const{data,error}=await sb.from("contenus").select("*");if(!error&&data&&data.length){state.contenus=data.map(r=>({...r,source:r.source||"seed"}));render();}}catch(e){console.warn("loadContenus:",e.message);}}
+async function loadContenus(){
+  if(!sb)return;
+  try{
+    const{data,error}=await sb.from("contenus").select("*");
+    if(!error&&data){
+      // toujours remplacer (même si vide) pour rester en sync
+      state.contenus=data.map(r=>({...r,source:r.source||"upload"}));
+      render();
+    }
+  }catch(e){console.warn("loadContenus:",e.message);}
+}
+let _realtimeCh=null;
+function setupRealtime(){
+  if(!sb||_realtimeCh)return;
+  try{
+    _realtimeCh=sb.channel("contenus-live")
+      .on("postgres_changes",{event:"*",schema:"public",table:"contenus"},payload=>{
+        const ev=payload.eventType;
+        if(ev==="INSERT"){
+          const c=payload.new;if(!state.contenus.find(x=>x.id===c.id)){state.contenus.push({...c,source:c.source||"upload"});toast("✓ Nouveau contenu ajouté","ok",2000);render();}
+        }else if(ev==="UPDATE"){
+          const c=payload.new;const i=state.contenus.findIndex(x=>x.id===c.id);if(i>=0){state.contenus[i]={...state.contenus[i],...c};render();}
+        }else if(ev==="DELETE"){
+          state.contenus=state.contenus.filter(x=>x.id!==payload.old.id);render();
+        }
+      })
+      .subscribe();
+  }catch(e){console.warn("Realtime:",e.message);}
+}
 async function checkSubscription(){if(!sb||!state.user)return;try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;const{data}=await sb.from("subscribers").select("status").eq("user_id",u.user.id).maybeSingle();if(data&&data.status==="active"){state.subscribed=true;render();}}catch(e){}}
 async function restoreSession(){if(!sb)return;try{const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=data.user.email===ADMIN_EMAIL;state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;showDbStatus(true);render();await checkSubscription();await loadProfile();render();}}catch(e){}}
 async function loadHiddenMatieres(){if(!sb)return;try{const{data,error}=await sb.from("matieres_hidden").select("*");if(!error&&data){state.hiddenMatieres=new Set(data.map(r=>`${r.univ}|${r.faculte}|${r.annee}|${r.matiere}`));}}catch(e){}}
@@ -400,14 +434,29 @@ function makeUserToken(contenu_id){
   const rand=Math.random().toString(36).slice(2,6);
   return `STUDIA|${contenu_id}|u:${uid}|${d}|${rand}`;
 }
-async function watermarkPDFBlob(blob,token,opt){
+async function watermarkPDFBlob(blob,token,userLabel){
   const doc=await PDFLib.PDFDocument.load(await blob.arrayBuffer(),{ignoreEncryption:true});
-  const qrDataUrl=await makeQR(token,256);
+  const qrDataUrl=await makeQR(token,200);
   const png=await doc.embedPng(await (await fetch(qrDataUrl)).arrayBuffer());
-  const o=opt||{mode:"mosaique",sizePct:7,opacity:.18};
-  doc.getPages().forEach(p=>{const{width:W,height:H}=p.getSize();const min=Math.min(W,H),s=Math.max(20,min*o.sizePct/100),pad=min*.03;
-    if(o.mode==="mosaique"){const gap=s*2.2;for(let y=pad;y<H;y+=gap)for(let x=pad;x<W;x+=gap)p.drawImage(png,{x,y,width:s,height:s,opacity:o.opacity});}
-    else{let x=pad,y=H-s-pad;p.drawImage(png,{x,y,width:s,height:s,opacity:o.opacity});}
+  const font=await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+  const fontBold=await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+  const label=userLabel||"abonné";
+  const date=new Date().toLocaleDateString("fr-FR");
+  doc.getPages().forEach((p,i)=>{
+    const{width:W,height:H}=p.getSize();
+    // Bandeau header vert clair
+    p.drawRectangle({x:0,y:H-22,width:W,height:22,color:PDFLib.rgb(.91,.97,.93),opacity:.92});
+    p.drawText("Studia · Tous droits réservés",{x:14,y:H-15,size:9,font:fontBold,color:PDFLib.rgb(.12,.55,.24)});
+    const rightText=`${label} · ${date}`;
+    const rightW=font.widthOfTextAtSize(rightText,9);
+    p.drawText(rightText,{x:W-rightW-14,y:H-15,size:9,font:font,color:PDFLib.rgb(.35,.35,.35)});
+    // QR discret coin haut-droit
+    const s=Math.max(34,Math.min(W,H)*.045);
+    p.drawImage(png,{x:W-s-10,y:H-s-30,width:s,height:s,opacity:.55});
+    // QR discret coin bas-gauche
+    p.drawImage(png,{x:10,y:10,width:s,height:s,opacity:.45});
+    // Footer
+    p.drawText(`Reproduction non autorisée · QR traçable · p. ${i+1}`,{x:14,y:s+18,size:7,font:font,color:PDFLib.rgb(.55,.55,.55)});
   });
   return new Blob([await doc.save()],{type:"application/pdf"});
 }
@@ -418,7 +467,9 @@ async function preparePDFForView(contenu,filePath){
     const blob=await fetchPDFFromBucket(filePath);
     if(!blob){state._pdfStatus="error";render();return;}
     const token=makeUserToken(contenu.id);
-    const wm=await watermarkPDFBlob(blob,token);
+    const p=state.profile||{};
+    const userLabel=((p.prenom||"")+" "+(p.nom||"")).trim()||(state.user&&state.user.email)||"abonné";
+    const wm=await watermarkPDFBlob(blob,token,userLabel);
     const url=URL.createObjectURL(wm);
     state._pdfUrl=url;state._pdfToken=token;state._pdfStatus="ready";
     // log dans downloads pour traçabilité
@@ -442,7 +493,9 @@ async function prepareCorrigeForView(contenu,corrigePath){
     const blob=await fetchPDFFromBucket(corrigePath);
     if(!blob){state._corrStatus="error";render();return;}
     const token=makeUserToken(contenu.id+"_corr");
-    const wm=await watermarkPDFBlob(blob,token);
+    const p=state.profile||{};
+    const userLabel=((p.prenom||"")+" "+(p.nom||"")).trim()||(state.user&&state.user.email)||"abonné";
+    const wm=await watermarkPDFBlob(blob,token,userLabel);
     state._corrUrl=URL.createObjectURL(wm);state._corrStatus="ready";render();
   }catch(e){state._corrStatus="error";render();}
 }
@@ -531,10 +584,10 @@ const FOUNDERS=[
 const SOCIAL=[
   {name:"LinkedIn",url:"#linkedin",svg:`<path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.063 2.063 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>`}
 ];
-const TYPES=["Cours","TD","Examen"];
+const TYPES=["Cours","TD","Midterm","Examen"];
 const TUTEURS=[["Léa M.","18"],["Karim B.","17"],["Yanis T.","16"],["Sofia R.","17"]];
-const kindLabel={Cours:"Cours",TD:"TD corrigé",Examen:"Examen corrigé"};
-const kindIcon={Cours:"📘",TD:"▶",Examen:"📝"};
+const kindLabel={Cours:"Cours",TD:"TD corrigé",Midterm:"Midterm (contrôle continu)",Examen:"Examen final"};
+const kindIcon={Cours:"📘",TD:"▶",Midterm:"🗒",Examen:"📝"};
 
 let _uid=0;
 // Démo data désactivée : le site démarre vide, l'admin remplit via la console.
@@ -558,6 +611,7 @@ const state={
   mediaTab:"sujet",
   _pdfUrl:null,_pdfStatus:null,_pdfToken:null,
   _corrUrl:null,_corrStatus:null,
+  pdfSize:"normal",
 };
 
 /* ===== templates ===== */
@@ -593,7 +647,8 @@ function computeStats(){
   const cs=state.contenus||[];
   const cours=cs.filter(c=>c.type==="Cours").length;
   const td=cs.filter(c=>c.type==="TD").length;
-  const examens=cs.filter(c=>c.type==="Examen").length;
+  const midterms=cs.filter(c=>c.type==="Midterm").length;
+  const examens=cs.filter(c=>c.type==="Examen").length+midterms;
   const minutes=cs.reduce((s,c)=>{const m=(c.duree||"").match(/(\d+)/);return s+(m?+m[1]:0);},0);
   const heures=Math.max(1,Math.round(minutes/60));
   return {cours,td,examens,heures,total:cs.length};
@@ -973,9 +1028,9 @@ function MyCoursesView(){
     </div>
 
     ${mats.length?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));margin-bottom:36px">
-      ${mats.map((m,i)=>{const cours=countMat(p.univ,p.faculte,annee,m,"Cours"),td=countMat(p.univ,p.faculte,annee,m,"TD"),ex=countMat(p.univ,p.faculte,annee,m,"Examen"),total=cours+td+ex;return `<div class="card card-h" style="padding:20px" onclick="goMatiereStudent('${esc(m).replace(/'/g,"\\'")}')">
+      ${mats.map((m,i)=>{const cours=countMat(p.univ,p.faculte,annee,m,"Cours"),td=countMat(p.univ,p.faculte,annee,m,"TD"),mid=countMat(p.univ,p.faculte,annee,m,"Midterm"),ex=countMat(p.univ,p.faculte,annee,m,"Examen"),total=cours+td+mid+ex;return `<div class="card card-h" style="padding:20px" onclick="goMatiereStudent('${esc(m).replace(/'/g,"\\'")}')">
         <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0;padding-right:8px;line-height:1.3">${esc(m)}</h3><span style="color:var(--muted)">›</span></div>
-        <div style="display:flex;gap:10px;font-size:12.5px;color:var(--sub);flex-wrap:wrap"><span>📘 ${cours} cours</span><span>▶ ${td} TD</span><span>📝 ${ex} ex.</span></div>
+        <div style="display:flex;gap:8px;font-size:12px;color:var(--sub);flex-wrap:wrap"><span>📘 ${cours}</span><span>▶ ${td} TD</span><span>🗒 ${mid} mid.</span><span>📝 ${ex} fin.</span></div>
         ${total===0?'<div class="muted" style="margin-top:8px;font-size:11.5px;font-style:italic">À venir</div>':""}
       </div>`;}).join("")}
     </div>`:`<div class="card" style="padding:48px;text-align:center;color:var(--muted);margin-bottom:36px">Aucune matière publiée en ${annee} pour ${esc(f.nom)} pour l'instant. Reviens bientôt — l'équipe Studia ajoute du contenu chaque semaine.</div>`}
@@ -1023,7 +1078,7 @@ function Programme(){
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">
       ${mats.map((m,i)=>`<div class="card card-h" style="padding:20px" onclick="openMatiere(${i})">
         <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:14px"><h3 style="font-size:17px;color:var(--ink);font-weight:600;margin:0;max-width:200px">${m}</h3><span style="color:var(--muted)">›</span></div>
-        <div style="display:flex;gap:14px;font-size:13px;color:var(--sub)"><span>${countMat(uid,fid,a,m,"Cours")} cours</span><span>${countMat(uid,fid,a,m,"TD")} TD</span><span>${countMat(uid,fid,a,m,"Examen")} exam.</span></div>
+        <div style="display:flex;gap:10px;font-size:12.5px;color:var(--sub);flex-wrap:wrap"><span>${countMat(uid,fid,a,m,"Cours")} cours</span><span>${countMat(uid,fid,a,m,"TD")} TD</span><span>${countMat(uid,fid,a,m,"Midterm")} mid.</span><span>${countMat(uid,fid,a,m,"Examen")} fin.</span></div>
       </div>`).join("")}
     </div>
   </div>`;
@@ -1031,12 +1086,12 @@ function Programme(){
 /* ===== Matiere ===== */
 function MatiereView(){
   const {annee,matiere,tab}=state, uid=state.univ.id, fid=state.faculte.id;
-  const map={cours:"Cours",td:"TD",examens:"Examen"};
-  const items=itemsFor(uid,fid,annee,matiere,map[tab]);
+  const map={cours:"Cours",td:"TD",midterms:"Midterm",examens:"Examen"};
+  const items=itemsFor(uid,fid,annee,matiere,map[tab]||"Cours");
   return `<div class="wrap fade" style="padding:30px 0 0">
     <button class="btn btn-ghost btn-sm" style="border:none;padding:0;color:var(--sub);margin-bottom:16px" onclick="nav('programme')">← ${state.faculte.nom} · ${annee}</button>
     <h1 class="serif" style="font-size:38px;color:var(--ink);margin:0 0 20px">${matiere}</h1>
-    <div class="tabs">${[["cours","Cours","Cours"],["td","TD corrigés","TD"],["examens","Examens corrigés","Examen"]].map(([id,lbl,ty])=>`<button class="${tab===id?"on":""}" onclick="setTab('${id}')">${lbl} <span style="color:var(--muted);font-weight:400">${countMat(uid,fid,annee,matiere,ty)}</span></button>`).join("")}</div>
+    <div class="tabs">${[["cours","Cours","Cours"],["td","TD corrigés","TD"],["midterms","Midterms","Midterm"],["examens","Examens finals","Examen"]].map(([id,lbl,ty])=>`<button class="${tab===id?"on":""}" onclick="setTab('${id}')">${lbl} <span style="color:var(--muted);font-weight:400">${countMat(uid,fid,annee,matiere,ty)}</span></button>`).join("")}</div>
     <div style="max-width:760px">${items.length?items.map(it=>{
       const locked=!it.gratuit&&!state.subscribed;
       return `<div class="card card-h row" onclick="openItem('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":kindIcon[it.type]}</div>
@@ -1046,12 +1101,11 @@ function MatiereView(){
   </div>`;
 }
 /* ===== Detail ===== */
-function watermarkOverlay(){
+function smallUserBadge(){
   if(!state.user)return "";
   const p=state.profile||{};
   const label=esc(((p.prenom||"")+" "+(p.nom||"")).trim()||state.user.email);
-  const cells=Array(15).fill(0).map(()=>`<span>STUDIA · ${label}</span>`).join("");
-  return `<div class="watermark-overlay">${cells}</div>`;
+  return `<div class="user-watermark">Studia · ${label}</div>`;
 }
 function MediaPlayer(it,unlocked){
   const v=parseVideoEmbed(it.video_url,true);
@@ -1064,21 +1118,30 @@ function MediaPlayer(it,unlocked){
   const usePdfPath=tab==="sujet"?it.file_path:it.corrige_path;
   const useUrl=tab==="sujet"?state._pdfUrl:state._corrUrl;
   const useStatus=tab==="sujet"?state._pdfStatus:state._corrStatus;
+  const size=state.pdfSize||"normal";
+  const sizeBar=usePdfPath?`<div class="media-toolbar"><span class="muted">Affichage</span><div class="size-controls">${[["compact","Compact"],["normal","Normal"],["large","Grand"]].map(([k,l])=>`<button class="${size===k?"on":""}" onclick="state.pdfSize='${k}';render()">${l}</button>`).join("")}</div><button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="openFullscreenPDF()" title="Plein écran">⛶ Plein écran</button></div>`:"";
   if(!unlocked){
     const thumb=v&&v.thumb;
     return `${tabsHTML}<div class="player-wrap" style="background:#111;display:flex;align-items:center;justify-content:center;color:#fff;position:relative">${thumb?`<img src="${thumb}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(10px) brightness(.4)"/>`:""}<div style="text-align:center;padding:24px;position:relative;z-index:1"><div style="font-size:32px;margin-bottom:10px">🔒</div><div style="margin-bottom:16px;font-size:15px">Contenu réservé aux abonnés</div><button class="btn btn-accent btn-lg" onclick="setModal(true)">S'abonner — 9 €/mois</button></div></div>`;
   }
   if(useVideo){
     const playerSrc=useVideo.kind==="file"?`<video src="${useVideo.embed}" controls autoplay muted></video>`:`<iframe src="${useVideo.embed}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
-    return `${tabsHTML}<div class="player-wrap hidden-on-blur">${playerSrc}${watermarkOverlay()}</div>`;
+    return `${tabsHTML}<div class="player-wrap hidden-on-blur">${playerSrc}${smallUserBadge()}</div>`;
   }
   if(usePdfPath){
-    if(useStatus==="loading")return `${tabsHTML}<div class="pdf-wrap hidden-on-blur"><div class="pdf-loading">📄 Préparation du document tatoué à ton compte…</div></div>`;
-    if(useStatus==="error")return `${tabsHTML}<div class="pdf-wrap"><div class="pdf-loading" style="color:#B4453A">❌ Impossible de charger le fichier. Recharge la page.</div></div>`;
-    if(useUrl)return `${tabsHTML}<div class="pdf-wrap hidden-on-blur no-screenshot"><iframe src="${useUrl}#toolbar=0&navpanes=0"></iframe>${watermarkOverlay()}</div>`;
-    return `${tabsHTML}<div class="pdf-wrap"><div class="pdf-loading">Chargement…</div></div>`;
+    if(useStatus==="loading")return `${tabsHTML}${sizeBar}<div class="pdf-wrap size-${size} hidden-on-blur"><div class="pdf-loading">📄 Préparation du document tatoué à ton compte…</div></div>`;
+    if(useStatus==="error")return `${tabsHTML}${sizeBar}<div class="pdf-wrap size-${size}"><div class="pdf-loading" style="color:#B4453A">❌ Impossible de charger le fichier. Recharge la page.</div></div>`;
+    if(useUrl)return `${tabsHTML}${sizeBar}<div class="pdf-wrap size-${size} hidden-on-blur no-screenshot"><iframe src="${useUrl}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0&view=FitH"></iframe>${smallUserBadge()}</div>`;
+    return `${tabsHTML}${sizeBar}<div class="pdf-wrap size-${size}"><div class="pdf-loading">Chargement…</div></div>`;
   }
   return `${tabsHTML}<div class="player-wrap" style="background:#F2F1EE;display:flex;align-items:center;justify-content:center;color:var(--sub)"><div style="text-align:center;padding:24px">📄 Aucun média pour cette section</div></div>`;
+}
+function openFullscreenPDF(){
+  const url=state.mediaTab==="corrige"?state._corrUrl:state._pdfUrl;
+  if(!url){toast("PDF pas encore prêt","warn");return;}
+  const w=window.open();
+  if(!w){toast("Pop-up bloqué — autorise les pop-ups","err",4000);return;}
+  w.document.write(`<!DOCTYPE html><html><head><title>${esc(state.item&&state.item.titre||"Studia")}</title><style>body,html{margin:0;padding:0;height:100vh;background:#222}iframe{width:100%;height:100%;border:0}</style></head><body><iframe src="${url}#toolbar=0&navpanes=0&view=FitH"></iframe></body></html>`);
 }
 function setMediaTab(tab,contenuId){
   state.mediaTab=tab;render();
@@ -1800,7 +1863,7 @@ function renderModal(){const r=document.getElementById("modalRoot");if(!state.mo
   r.innerHTML=`<div class="modal-bg" onclick="setModal(false)"><div class="modal fade" onclick="event.stopPropagation()"><div style="display:flex;justify-content:space-between"><span style="color:var(--accent)">✦</span><button style="background:none;border:none;color:var(--muted);cursor:pointer" onclick="setModal(false)">✕</button></div><h3 class="serif" style="font-size:26px;color:var(--ink);margin:12px 0 6px">Débloque tout Studia</h3><p style="font-size:14px;color:var(--sub);margin:0 0 18px;line-height:1.5">Accès illimité aux cours, TD et examens corrigés.</p><button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="startCheckout('semestre')">Pass semestriel — 39€</button><button class="btn btn-ghost" style="width:100%;margin-bottom:14px" onclick="startCheckout('mensuel')">Mensuel — 9€/mois</button>${hasStripe?'<p class="muted" style="text-align:center;margin:0">Paiement sécurisé via Stripe.</p>':`<div style="border-top:1px solid var(--border);padding-top:12px"><button class="btn btn-ink btn-sm" style="width:100%" onclick="subscribe()">Activer l'accès (démo)</button><p class="muted" style="text-align:center;margin-top:8px">Stripe non configuré — bouton démo.</p></div>`}</div></div>`;
 }
 
-window.addEventListener("load",()=>{if(typeof QRCode==="undefined")console.warn("QR lib non chargée");initSupabase();render();if(sb){loadContenus();loadHiddenMatieres();restoreSession();}});
+window.addEventListener("load",()=>{if(typeof QRCode==="undefined")console.warn("QR lib non chargée");initSupabase();render();if(sb){loadContenus();loadHiddenMatieres();restoreSession();setupRealtime();}});
 </script>
 </body>
 </html>
