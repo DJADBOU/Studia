@@ -35,8 +35,9 @@ a{color:inherit;text-decoration:none}
 .input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--borderStrong);background:var(--bg);font-size:14px;color:var(--ink);outline:none}
 .input:focus{border-color:var(--accent)}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:14px}
-.card-h{transition:border-color .15s,transform .15s;cursor:pointer}
-.card-h:hover{border-color:var(--borderStrong);transform:translateY(-1px)}
+.card-h{transition:all .2s cubic-bezier(.2,.7,.2,1);cursor:pointer}
+.card-h:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 28px rgba(30,140,60,.10)}
+.card-h:active{transform:translateY(-1px);transition:transform .05s}
 .muted{color:var(--muted);font-size:12px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .fade{animation:fadeUp .45s ease both}
@@ -69,8 +70,15 @@ a{color:inherit;text-decoration:none}
 .ctrl-row b{color:var(--ink);font-weight:500}
 input[type=range]{width:100%;accent-color:var(--accent)}
 .token{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--accentDark);background:var(--accentSoft);padding:3px 7px;border-radius:6px;word-break:break-all}
-.thumb{width:70px;height:70px;border-radius:9px;border:1px solid var(--border);background:#F2F1EE;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;overflow:hidden}
+.thumb{width:70px;height:70px;border-radius:9px;border:1px solid var(--border);background:#F2F1EE;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;overflow:hidden;cursor:pointer;position:relative;transition:transform .15s}
+.thumb:hover{transform:scale(1.04)}
 .thumb img{width:100%;height:100%;object-fit:cover}
+.thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);color:#fff;font-size:18px;opacity:0;transition:opacity .15s}
+.thumb:hover .play{opacity:1}
+.video-preview-modal{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:40px;animation:fadeUp .25s ease}
+.video-preview-modal .box{width:100%;max-width:920px;aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden;position:relative}
+.video-preview-modal iframe{width:100%;height:100%;border:0}
+.video-preview-modal .close{position:absolute;top:-44px;right:0;background:rgba(255,255,255,.1);border:none;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:16px}
 .qrmini{width:46px;height:46px;border:1px solid var(--border);border-radius:7px;padding:3px;background:#fff;flex-shrink:0}
 .qrmini img{width:100%;height:100%}
 .note{display:flex;gap:10px;background:var(--amberSoft);border:1px solid #EADFC4;border-radius:12px;padding:14px;font-size:13px;color:#6B5418;line-height:1.55}
@@ -295,6 +303,24 @@ function setupRealtime(){
 }
 async function checkSubscription(){if(!sb||!state.user)return;try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;const{data}=await sb.from("subscribers").select("status").eq("user_id",u.user.id).maybeSingle();if(data&&data.status==="active"){state.subscribed=true;render();}}catch(e){}}
 async function loadAdmins(){if(!sb)return;try{const{data,error}=await sb.from("admins").select("email");if(!error&&data){ADMIN_EMAILS=new Set([ADMIN_EMAIL,...data.map(r=>r.email)]);}}catch(e){}}
+async function uploadAvatar(file){
+  if(!file||!sb||!state.user){toast("Pas connecté","err");return;}
+  if(!file.type.startsWith("image/")){toast("Image uniquement","err");return;}
+  if(file.size>4*1024*1024){toast("Image trop grosse (max 4 Mo)","err");return;}
+  toast("📤 Upload de la photo…","ok",1500);
+  try{
+    const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
+    const ext=(file.name.match(/\.[^.]+$/)||[".jpg"])[0];
+    const path=`${u.user.id}${ext}`;
+    const{error}=await sb.storage.from("avatars").upload(path,file,{upsert:true,contentType:file.type});
+    if(error){toast("Échec upload : "+error.message,"err",4000);return;}
+    const{data:urlData}=sb.storage.from("avatars").getPublicUrl(path);
+    const avatar_url=urlData.publicUrl+"?t="+Date.now(); // cache bust
+    await saveProfile({avatar_url});
+    state.profile={...(state.profile||{}),avatar_url};
+    render();
+  }catch(e){toast("Erreur : "+e.message,"err");}
+}
 async function loadCategories(){
   if(!sb)return;
   try{
@@ -578,10 +604,24 @@ function parseVideoEmbed(url,autoplay){
 // Si un fichier manque, fallback automatique (badge initiale ou gradient).
 const ASSET=name=>`${CONFIG.SUPABASE_URL}/storage/v1/object/public/assets/${name}`;
 const UNIV_LOGOS={
+  // Universités
   uca:ASSET("uca.png"),
   amu:ASSET("amu.png"),
   p1:ASSET("p1.png"),
-  tse:ASSET("tse.png")
+  assas:ASSET("assas.png"),
+  dauphine:ASSET("dauphine.png"),
+  lyon:ASSET("lyon.png"),
+  bordeaux:ASSET("bordeaux.png"),
+  nantes:ASSET("nantes.png"),
+  tse:ASSET("tse.png"),
+  // Écoles de commerce
+  hec:ASSET("hec.png"),
+  essec:ASSET("essec.png"),
+  escp:ASSET("escp.png"),
+  emlyon:ASSET("emlyon.png"),
+  edhec:ASSET("edhec.png"),
+  skema:ASSET("skema.png"),
+  audencia:ASSET("audencia.png")
 };
 const SITE_IMG={
   hero:ASSET("hero.jpg"),
@@ -592,17 +632,43 @@ const SITE_IMG={
   uca:ASSET("campus-uca.jpg"),
   amu:ASSET("campus-amu.jpg"),
   p1:ASSET("campus-p1.jpg"),
-  tse:ASSET("campus-tse.jpg")
+  assas:ASSET("campus-assas.jpg"),
+  dauphine:ASSET("campus-dauphine.jpg"),
+  lyon:ASSET("campus-lyon.jpg"),
+  bordeaux:ASSET("campus-bordeaux.jpg"),
+  nantes:ASSET("campus-nantes.jpg"),
+  tse:ASSET("campus-tse.jpg"),
+  hec:ASSET("campus-hec.jpg"),
+  essec:ASSET("campus-essec.jpg"),
+  escp:ASSET("campus-escp.jpg"),
+  emlyon:ASSET("campus-emlyon.jpg"),
+  edhec:ASSET("campus-edhec.jpg"),
+  skema:ASSET("campus-skema.jpg"),
+  audencia:ASSET("campus-audencia.jpg")
 };
 const UNIVS=[
- {id:"uca",nom:"Université Côte d'Azur",ville:"Nice",actif:true,facultes:[
+ // ===== UNIVERSITÉS PUBLIQUES =====
+ {id:"uca",nom:"Université Côte d'Azur",ville:"Nice",type:"univ",actif:true,facultes:[
    {id:"eg",nom:"Économie & Gestion",mat:{L1:[],L2:[],L3:[]}},
    {id:"droit",nom:"Droit",mat:{L1:[],L2:[],L3:[]}},
    {id:"maths",nom:"Mathématiques",mat:{L1:[],L2:[],L3:[]}},
  ]},
- {id:"amu",nom:"Aix-Marseille Université",ville:"Aix-en-Provence",actif:false,facultes:[]},
- {id:"p1",nom:"Paris 1 Panthéon-Sorbonne",ville:"Paris",actif:false,facultes:[]},
- {id:"tse",nom:"Toulouse School of Economics",ville:"Toulouse",actif:false,facultes:[]},
+ {id:"p1",nom:"Paris 1 Panthéon-Sorbonne",ville:"Paris",type:"univ",actif:false,facultes:[]},
+ {id:"assas",nom:"Paris 2 Panthéon-Assas",ville:"Paris",type:"univ",actif:false,facultes:[]},
+ {id:"dauphine",nom:"Paris Dauphine - PSL",ville:"Paris",type:"univ",actif:false,facultes:[]},
+ {id:"lyon",nom:"Université Lyon",ville:"Lyon",type:"univ",actif:false,facultes:[]},
+ {id:"amu",nom:"Aix-Marseille Université",ville:"Aix-en-Provence",type:"univ",actif:false,facultes:[]},
+ {id:"tse",nom:"Toulouse School of Economics",ville:"Toulouse",type:"univ",actif:false,facultes:[]},
+ {id:"bordeaux",nom:"Université de Bordeaux",ville:"Bordeaux",type:"univ",actif:false,facultes:[]},
+ {id:"nantes",nom:"Nantes Université",ville:"Nantes",type:"univ",actif:false,facultes:[]},
+ // ===== ÉCOLES DE COMMERCE =====
+ {id:"hec",nom:"HEC Paris",ville:"Jouy-en-Josas",type:"esc",actif:false,facultes:[]},
+ {id:"essec",nom:"ESSEC Business School",ville:"Cergy",type:"esc",actif:false,facultes:[]},
+ {id:"escp",nom:"ESCP Business School",ville:"Paris",type:"esc",actif:false,facultes:[]},
+ {id:"emlyon",nom:"emlyon business school",ville:"Lyon",type:"esc",actif:false,facultes:[]},
+ {id:"edhec",nom:"EDHEC Business School",ville:"Lille / Nice",type:"esc",actif:false,facultes:[]},
+ {id:"skema",nom:"SKEMA Business School",ville:"Sophia Antipolis",type:"esc",actif:false,facultes:[]},
+ {id:"audencia",nom:"Audencia",ville:"Nantes",type:"esc",actif:false,facultes:[]},
 ];
 const TESTIMONIALS=[
   ["Avant Studia, je décrochais en micro. Avec les vidéos de Léa, j'ai eu 14 au partiel. Mille fois plus clair que mon prof.","Antoine M.","L2 Éco · Nice"],
@@ -638,6 +704,8 @@ function typeIds(){return (state.categories&&state.categories.length?state.categ
 function allCategories(){return state.categories&&state.categories.length?state.categories:DEFAULT_CATEGORIES;}
 function labelFor(id){const c=allCategories().find(x=>x.id===id);return c?c.label:(id||"—");}
 function iconFor(id){const c=allCategories().find(x=>x.id===id);return c?c.icon:"📄";}
+// Icône intelligente basée sur le média réel : vidéo si URL vidéo, PDF si fichier, sinon icône de catégorie
+function smartIcon(c){if(!c)return "📄";const hasVideo=!!(c.video_url||c.video_corrige_url);const hasFile=!!(c.file_path||c.corrige_path);if(hasVideo&&hasFile)return "🎬";if(hasVideo)return "▶";if(hasFile)return "📄";return iconFor(c.type);}
 
 let _uid=0;
 // Démo data désactivée : le site démarre vide, l'admin remplit via la console.
@@ -746,7 +814,15 @@ async function goProfile(){
   render();
 }
 function goProgramme(){ state.view = state.faculte?"programme":(state.univ?"facultes":"univs"); render(); }
-function selectUniv(id){const u=univById(id);if(!u||!u.actif)return;state.univ=u;state.faculte=null;state.view="facultes";render();}
+function selectUniv(id){
+  // Lock : étudiant non-admin avec profil → ne peut accéder qu'à son université
+  if(state.user&&!isAdminUser()&&hasProfile()&&state.profile.univ&&id!==state.profile.univ){
+    const u=univById(state.profile.univ);
+    toast(`Tu es inscrit à ${u?u.nom:"ton université"}`,"warn",3000);
+    return;
+  }
+  const u=univById(id);if(!u||!u.actif)return;state.univ=u;state.faculte=null;state.view="facultes";render();
+}
 function selectFaculte(fid){const f=facById(state.univ.id,fid);if(!f)return;state.faculte=f;state.annee="L1";state.view="programme";render();}
 function pickAnnee(a){state.annee=a;render();}
 function openMatiere(idx){const m=matieresFor(state.univ.id,state.faculte.id,state.annee)[idx];if(m==null)return;state.matiere=m;state.tab=(allCategories()[0]||{id:"Cours"}).id;state.view="matiere";render();}
@@ -791,25 +867,42 @@ function toggleMenu(){state.menu=!state.menu;render();}
 function loginAdmin(){state.user={email:ADMIN_EMAIL,role:"admin"};state.adminAuthed=true;state.a.view="univ";state.view="admin";state.menu=false;render();}
 function loginStudent(email){state.user={email,role:"student"};state.adminAuthed=false;state.view="univs";state.menu=false;render();}
 async function doAuth(){
-  const email=(document.getElementById("authEmail").value||"").trim();
-  const pass=(document.getElementById("authPass").value||"");
+  const get=id=>{const el=document.getElementById(id);return el?(el.value||"").trim():"";};
+  const email=get("authEmail").toLowerCase();
+  const pass=get("authPass");
   const err=document.getElementById("authErr");
   if(err){err.style.color="#B4453A";err.textContent="";}
   if(!email||!pass){if(err)err.textContent="Renseigne ton email et ton mot de passe.";return;}
   if(pass.length<6){if(err)err.textContent="Mot de passe : 6 caractères minimum.";return;}
+  const isSignup=state.authMode==="signup";
+  // Collecte des champs profil au signup
+  const profileData=isSignup?{
+    prenom:get("authPrenom"),nom:get("authNom"),phone:get("authPhone"),
+    univ:get("authUniv")||"uca",faculte:get("authFaculte"),annee:get("authAnnee")||"L1"
+  }:null;
+  if(isSignup){
+    if(!profileData.prenom||!profileData.nom){if(err)err.textContent="Prénom et nom requis.";return;}
+    if(!profileData.faculte){if(err)err.textContent="Choisis ta filière.";return;}
+  }
   if(sb){
     try{
-      const isSignup=state.authMode==="signup";
       const {data,error}=await (isSignup?sb.auth.signUp({email,password:pass}):sb.auth.signInWithPassword({email,password:pass}));
       if(error){if(err)err.textContent=error.message;return;}
+      // Si signup → on stocke en localStorage les champs profil, ils seront upserts dès que la session est active
+      if(isSignup&&profileData){
+        try{localStorage.setItem("studia_pending_profile_"+email,JSON.stringify(profileData));}catch(e){}
+      }
       if(isSignup&&!data.session){
         if(err){err.style.color="var(--accentDark)";err.textContent="✓ Compte créé. Vérifie ta boîte mail pour confirmer.";}
         return;
       }
       const isAdmin=isAdminEmail(email);state.user={email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;state.menu=false;showDbStatus(true);toast(isAdmin?"Connecté en admin":"Bienvenue !","ok");
-      // Charge profile puis redirige : admin→console, étudiant avec profil→mon espace, sinon→univs
+      // Sauve immédiatement le profil si signup réussi avec session active
+      if(isSignup&&data.session&&profileData)await saveProfile(profileData);
       if(isAdmin){state.view="admin";render();checkSubscription();loadProfile();return;}
       await loadProfile();await checkSubscription();
+      // Restaure le pending profile si existe (cas confirm mail → premier login)
+      try{const pending=localStorage.getItem("studia_pending_profile_"+email);if(pending&&!hasProfile()){const pd=JSON.parse(pending);await saveProfile(pd);localStorage.removeItem("studia_pending_profile_"+email);await loadProfile();}}catch(e){}
       state.view=hasProfile()?"mycourses":"univs";
       if(state.view==="mycourses")loadMyStats().then(s=>{state.myStats=s;render();});
       render();return;
@@ -892,11 +985,19 @@ function Landing(){
     </section>
 
     <section class="sec reveal" style="border:none;padding-top:24px">
-      <span class="eyebrow">Les universités déjà sur Studia</span>
+      <span class="eyebrow">Les écoles déjà sur Studia</span>
       <h2 class="sec-title">On s'étend campus par campus.</h2>
-      <p class="sec-lead">Chaque université dispose de ses propres tuteurs majors. On vérifie la qualité avant publication.</p>
+      <p class="sec-lead">Chaque école dispose de ses propres tuteurs majors. On vérifie la qualité avant publication.</p>
+      <h3 style="font-size:14px;letter-spacing:.5px;text-transform:uppercase;color:var(--sub);margin:8px 0 14px;font-weight:600">🎓 Universités</h3>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-bottom:36px">
+        ${UNIVS.filter(u=>u.type!=="esc").map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.6"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
+          <div class="photo" style="aspect-ratio:16/10"><img loading="lazy" src="${SITE_IMG[u.id]}" onerror="this.remove()"/></div>
+          <div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="display:flex;align-items:center;gap:10px;min-width:0">${univLogoHTML(u)}<div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.2">${u.nom}</div></div>${u.actif?'<span class="pill">Live</span>':'<span class="tag">Bientôt</span>'}</div><div class="muted" style="margin-top:8px">${u.ville}${u.actif?` · ${u.facultes.length} filières`:""}</div></div>
+        </div>`).join("")}
+      </div>
+      <h3 style="font-size:14px;letter-spacing:.5px;text-transform:uppercase;color:var(--sub);margin:8px 0 14px;font-weight:600">💼 Écoles de commerce</h3>
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
-        ${UNIVS.map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.6"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
+        ${UNIVS.filter(u=>u.type==="esc").map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.6"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
           <div class="photo" style="aspect-ratio:16/10"><img loading="lazy" src="${SITE_IMG[u.id]}" onerror="this.remove()"/></div>
           <div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="display:flex;align-items:center;gap:10px;min-width:0">${univLogoHTML(u)}<div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.2">${u.nom}</div></div>${u.actif?'<span class="pill">Live</span>':'<span class="tag">Bientôt</span>'}</div><div class="muted" style="margin-top:8px">${u.ville}${u.actif?` · ${u.facultes.length} filières`:""}</div></div>
         </div>`).join("")}
@@ -975,16 +1076,18 @@ function navRight(){
   if(state.user){
     if(state.user.role==="admin")r=`<button class="link ${state.view==="admin"?"on":""}" onclick="nav('admin')">Console</button>`+r;
     const initials=getInitials(state.profile,state.user);
-    r+=`<button title="Mon profil" onclick="goProfile()" style="margin-left:8px;width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;border:none;font-weight:700;font-size:13px;line-height:1;letter-spacing:-.3px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;padding:0;text-align:center">${initials}</button>`;
+    const av=state.profile&&state.profile.avatar_url;
+    r+=`<button title="Mon profil" onclick="goProfile()" style="margin-left:8px;width:36px;height:36px;border-radius:50%;background:${av?'#fff':'linear-gradient(135deg,#5BD974,#1E8C3C)'};color:#fff;border:none;font-weight:700;font-size:13px;line-height:1;letter-spacing:-.3px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;padding:0;text-align:center">${av?`<img src="${av}" style="width:100%;height:100%;object-fit:cover"/>`:initials}</button>`;
   }
   else r+='<button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="nav(\'login\')">Connexion</button>';
   return r;
 }
 function MobileMenu(){
   const showMyEspace=!!state.user;
+  const isLockedStudent=state.user&&!isAdminUser()&&hasProfile();
   return `<div class="mobile-menu"><div class="wrap" style="padding-bottom:8px">
   ${showMyEspace?`<button onclick="goMyCourses()">Mon espace</button>`:""}
-  <button onclick="goProgramme()">${showMyEspace?"Explorer":"Programme"}</button>
+  ${!isLockedStudent?`<button onclick="goProgramme()">${showMyEspace?"Explorer":"Programme"}</button>`:""}
   <button onclick="nav('tarifs')">Tarifs</button>
   <button onclick="nav('tuteur')">Devenir tuteur</button>
   ${state.user?`<button onclick="goProfile()">Mon profil</button>`+(state.user.role==="admin"?`<button onclick="nav('admin')">Console</button>`:"")+`<button onclick="logout()">Déconnexion</button>`:`<button onclick="nav('login')">Connexion</button>`}
@@ -992,13 +1095,15 @@ function MobileMenu(){
 </div></div>`;}
 function hasProfile(){const p=state.profile;return !!(p&&p.univ&&p.faculte);}
 function Nav(){
-  // Mon espace visible dès qu'on est connecté — si le profil n'est pas complet, la page redirige vers Compléter mon profil
   const showMyEspace=!!state.user;
+  // Cache Explorer/Programme pour les étudiants connectés avec profil (lockés à leur fac)
+  const isLockedStudent=state.user&&!isAdminUser()&&hasProfile();
+  const showExplorer=!isLockedStudent;
   return `<div class="nav"><div class="wrap nav-in">
     <div onclick="nav('landing')" style="display:flex;align-items:center;gap:8px;cursor:pointer"><div class="logo">S</div><span style="font-weight:600;font-size:17px;color:var(--ink)">Studia</span></div>
     <div class="nav-links">
       ${showMyEspace?`<button class="link ${state.view==="mycourses"?"on":""}" onclick="goMyCourses()">Mon espace</button>`:""}
-      <button class="link ${["univs","facultes","programme","matiere","detail"].includes(state.view)?"on":""}" onclick="goProgramme()">${showMyEspace?"Explorer":"Programme"}</button>
+      ${showExplorer?`<button class="link ${["univs","facultes","programme","matiere","detail"].includes(state.view)?"on":""}" onclick="goProgramme()">${showMyEspace?"Explorer":"Programme"}</button>`:""}
       <button class="link ${state.view==="tarifs"?"on":""}" onclick="nav('tarifs')">Tarifs</button>
       <button class="link ${state.view==="tuteur"?"on":""}" onclick="nav('tuteur')">Devenir tuteur</button>
       ${navRight()}
@@ -1017,15 +1122,23 @@ function Ctx(){
 }
 
 /* ===== Univs ===== */
+function univCardHTML(u){return `<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.55"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
+  <div class="photo" style="aspect-ratio:16/9"><img loading="lazy" src="${SITE_IMG[u.id]}" onerror="this.remove()"/></div>
+  <div style="padding:18px"><div style="display:flex;justify-content:space-between;align-items:center">${univLogoHTML(u)}${u.actif?'<span class="pill">Disponible</span>':'<span class="tag">Bientôt</span>'}</div><div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.3;margin-top:12px">${u.nom}</div><div style="font-size:13px;color:var(--sub);margin-top:3px">${u.ville}${u.actif?` · ${u.facultes.length} filières`:""}</div></div>
+</div>`;}
 function UnivsView(){
+  const univs=UNIVS.filter(u=>u.type!=="esc");
+  const escs=UNIVS.filter(u=>u.type==="esc");
   return `<div class="wrap fade" style="padding:54px 0 0">
-    <h1 class="serif" style="font-size:42px;color:var(--ink);margin:0 0 8px">Choisis ton université</h1>
-    <p style="font-size:15px;color:var(--sub);margin:0 0 30px">Studia s'étend université par université. Sélectionne la tienne.</p>
+    <h1 class="serif" style="font-size:42px;color:var(--ink);margin:0 0 8px">Choisis ton école</h1>
+    <p style="font-size:15px;color:var(--sub);margin:0 0 30px">Studia s'étend établissement par établissement. Sélectionne le tien.</p>
+    <h3 style="font-size:14px;letter-spacing:.5px;text-transform:uppercase;color:var(--sub);margin:0 0 14px;font-weight:600">🎓 Universités</h3>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:40px">
+      ${univs.map(univCardHTML).join("")}
+    </div>
+    <h3 style="font-size:14px;letter-spacing:.5px;text-transform:uppercase;color:var(--sub);margin:0 0 14px;font-weight:600">💼 Écoles de commerce</h3>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
-      ${UNIVS.map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.55"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
-        <div class="photo" style="aspect-ratio:16/9"><img loading="lazy" src="${SITE_IMG[u.id]}" onerror="this.remove()"/></div>
-        <div style="padding:18px"><div style="display:flex;justify-content:space-between;align-items:center">${univLogoHTML(u)}${u.actif?'<span class="pill">Disponible</span>':'<span class="tag">Bientôt</span>'}</div><div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.3;margin-top:12px">${u.nom}</div><div style="font-size:13px;color:var(--sub);margin-top:3px">${u.ville}${u.actif?` · ${u.facultes.length} filières`:""}</div></div>
-      </div>`).join("")}
+      ${escs.map(univCardHTML).join("")}
     </div>
   </div>`;
 }
@@ -1084,7 +1197,7 @@ function MyCoursesView(){
     <div class="card" style="padding:24px 26px;margin-bottom:28px;background:linear-gradient(135deg,#FBFBFA,#F5FBF7);border-color:var(--accent)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span class="eyebrow" style="margin:0">Continue ta progression</span><span class="muted" style="font-size:11.5px">${s.count} ${s.count>1?"contenus suivis":"contenu suivi"} · ${fmtDuration(s.seconds)} étudié</span></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">
-        ${s.recent.slice(0,3).map(r=>{const c=state.contenus.find(x=>x.id===r.contenu_id);if(!c)return "";return `<div class="card card-h" style="padding:14px;display:flex;align-items:center;gap:12px" onclick="resumeContenu('${c.id}')"><div class="ic">${iconFor(c.type)}</div><div style="flex:1;min-width:0"><div style="font-weight:500;color:var(--ink);font-size:14px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.titre||"")}</div><div class="muted" style="font-size:11.5px">${fmtDuration(r.duration_seconds)} · ${fmtRelativeDate(r.updated_at)}</div></div><span style="color:var(--muted)">▶</span></div>`;}).join("")}
+        ${s.recent.slice(0,3).map(r=>{const c=state.contenus.find(x=>x.id===r.contenu_id);if(!c)return "";return `<div class="card card-h" style="padding:14px;display:flex;align-items:center;gap:12px" onclick="resumeContenu('${c.id}')"><div class="ic">${smartIcon(c)}</div><div style="flex:1;min-width:0"><div style="font-weight:500;color:var(--ink);font-size:14px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.titre||"")}</div><div class="muted" style="font-size:11.5px">${fmtDuration(r.duration_seconds)} · ${fmtRelativeDate(r.updated_at)}</div></div><span style="color:var(--muted)">▶</span></div>`;}).join("")}
       </div>
     </div>`:""}
 
@@ -1107,7 +1220,7 @@ function MyCoursesView(){
     ${recentUploads.length?`<div style="margin-bottom:32px">
       <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 14px">Dernières nouveautés ${annee}</h2>
       <div style="display:grid;gap:10px">
-        ${recentUploads.map(it=>{const locked=!it.gratuit&&!state.subscribed;return `<div class="card card-h row" onclick="openItemFromMyCourses('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":iconFor(it.type)}</div><div style="flex:1;min-width:0"><div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span class="tag">${labelFor(it.type)}</span><span class="tag">${esc(it.matiere||"")}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}</div><div style="font-size:15px;color:var(--ink);font-weight:500">${esc(it.titre||"")}</div><div class="muted">★ ${esc(it.tuteur||"—")} · ${esc(it.note||"—")}/20${it.duree?" · "+esc(it.duree):""}</div></div><span style="color:var(--muted)">›</span></div>`;}).join("")}
+        ${recentUploads.map(it=>{const locked=!it.gratuit&&!state.subscribed;return `<div class="card card-h row" onclick="openItemFromMyCourses('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":smartIcon(it)}</div><div style="flex:1;min-width:0"><div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span class="tag">${labelFor(it.type)}</span><span class="tag">${esc(it.matiere||"")}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}</div><div style="font-size:15px;color:var(--ink);font-weight:500">${esc(it.titre||"")}</div><div class="muted">★ ${esc(it.tuteur||"—")} · ${esc(it.note||"—")}/20${it.duree?" · "+esc(it.duree):""}</div></div><span style="color:var(--muted)">›</span></div>`;}).join("")}
       </div>
     </div>`:""}
 
@@ -1167,7 +1280,7 @@ function MatiereView(){
     <div class="tabs">${cats.map(c=>`<button class="${tab===c.id?"on":""}" onclick="setTab('${c.id}')">${esc(c.label)} <span style="color:var(--muted);font-weight:400">${countMat(uid,fid,annee,matiere,c.id,sem)}</span></button>`).join("")}</div>
     <div style="max-width:760px">${items.length?items.map(it=>{
       const locked=!it.gratuit&&!state.subscribed&&!isAdminUser();
-      return `<div class="card card-h row" onclick="openItem('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":iconFor(it.type)}</div>
+      return `<div class="card card-h row" onclick="openItem('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":smartIcon(it)}</div>
         <div style="flex:1;min-width:0"><div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span class="tag">${labelFor(it.type)}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}${it.source==="upload"?'<span class="tag amber">Nouveau</span>':""}${it.video_url?'<span class="pill">▶ Vidéo</span>':""}</div>
         <div style="font-size:15px;color:var(--ink);font-weight:500;margin-bottom:3px">${it.titre}</div><div class="muted">★ ${it.tuteur} · ${it.note}/20${it.duree?" · "+it.duree:""}</div></div><span style="color:var(--muted)">›</span></div>`;
     }).join(""):`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucun contenu ici pour l'instant.</div>`}</div>
@@ -1339,12 +1452,16 @@ function ProfileView(){
   const p=state.profile||{};
   const s=state.myStats||{count:0,seconds:0,recent:[]};
   const initials=getInitials(p,state.user);
+  const avatarUrl=p.avatar_url||null;
   const editing=state.editProfile;
   const nom=p.nom||"", prenom=p.prenom||"", univ=p.univ||"uca", faculte=p.faculte||"", annee=p.annee||"L1", bio=p.bio||"";
   return `<div class="wrap fade" style="padding:40px 0;max-width:900px">
     <div class="card" style="padding:32px;margin-bottom:22px">
       <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
-        <div class="founder-avatar" style="width:88px;height:88px;font-size:30px">${initials}</div>
+        <div style="position:relative;display:inline-block">
+          <div class="founder-avatar" style="width:96px;height:96px;font-size:32px">${avatarUrl?`<img src="${avatarUrl}" alt=""/>`:initials}</div>
+          <label style="position:absolute;bottom:-2px;right:-2px;width:30px;height:30px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #fff;font-size:14px" title="Changer ma photo">📷<input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this.files[0])"/></label>
+        </div>
         <div style="flex:1;min-width:240px">
           ${editing?`
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
@@ -1384,7 +1501,7 @@ function ProfileView(){
 
     <div class="card" style="padding:24px 26px;margin-bottom:22px">
       <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 14px">Continue ta progression</h2>
-      ${s.recent.length?`<div style="display:grid;gap:10px">${s.recent.map(r=>{const c=state.contenus.find(x=>x.id===r.contenu_id);if(!c)return `<div class="muted" style="padding:10px 0">Contenu indisponible (id ${r.contenu_id})</div>`;return `<div class="card card-h" style="padding:14px 16px;display:flex;align-items:center;gap:14px" onclick="state.item=state.contenus.find(x=>x.id==='${c.id}');state.view='detail';state.univ=univById('${c.univ}');state.faculte=facById('${c.univ}','${c.faculte}');state.matiere='${esc(c.matiere).replace(/'/g,"\\'")}';render()"><div class="ic">${iconFor(c.type)}</div><div style="flex:1;min-width:0"><div style="font-weight:500;color:var(--ink);font-size:14.5px;margin-bottom:2px">${esc(c.titre||"")}</div><div class="muted">${labelFor(c.type)} · ${esc(c.matiere||"")} · ${fmtDuration(r.duration_seconds)} étudié · ${fmtRelativeDate(r.updated_at)}</div></div><span style="color:var(--muted)">›</span></div>`;}).join("")}</div>`:'<div class="muted" style="padding:14px 0">Tu n\'as pas encore ouvert de contenu. Vas dans le <a onclick="nav(\'univs\')" style="color:var(--accentDark);cursor:pointer">Programme</a> pour commencer.</div>'}
+      ${s.recent.length?`<div style="display:grid;gap:10px">${s.recent.map(r=>{const c=state.contenus.find(x=>x.id===r.contenu_id);if(!c)return `<div class="muted" style="padding:10px 0">Contenu indisponible (id ${r.contenu_id})</div>`;return `<div class="card card-h" style="padding:14px 16px;display:flex;align-items:center;gap:14px" onclick="state.item=state.contenus.find(x=>x.id==='${c.id}');state.view='detail';state.univ=univById('${c.univ}');state.faculte=facById('${c.univ}','${c.faculte}');state.matiere='${esc(c.matiere).replace(/'/g,"\\'")}';render()"><div class="ic">${smartIcon(c)}</div><div style="flex:1;min-width:0"><div style="font-weight:500;color:var(--ink);font-size:14.5px;margin-bottom:2px">${esc(c.titre||"")}</div><div class="muted">${labelFor(c.type)} · ${esc(c.matiere||"")} · ${fmtDuration(r.duration_seconds)} étudié · ${fmtRelativeDate(r.updated_at)}</div></div><span style="color:var(--muted)">›</span></div>`;}).join("")}</div>`:'<div class="muted" style="padding:14px 0">Tu n\'as pas encore ouvert de contenu. Vas dans le <a onclick="nav(\'univs\')" style="color:var(--accentDark);cursor:pointer">Programme</a> pour commencer.</div>'}
     </div>
 
     <div class="card" style="padding:24px 26px">
@@ -1508,20 +1625,37 @@ function DroitsView(){
 /* ===== Login ===== */
 function LoginView(){
   const signup=state.authMode==="signup";
-  return `<div class="wrap fade" style="max-width:400px;padding:60px 0"><div class="card" style="padding:32px">
+  const univSelected=state._signupUniv||"uca";
+  const u=univById(univSelected);
+  return `<div class="wrap fade" style="max-width:440px;padding:60px 0"><div class="card" style="padding:32px">
     <div class="logo" style="margin-bottom:16px">S</div>
     <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:20px">
       <button class="auth-tab ${!signup?"on":""}" onclick="setAuthMode('login')">Connexion</button>
       <button class="auth-tab ${signup?"on":""}" onclick="setAuthMode('signup')">Inscription</button>
     </div>
-    ${signup?`<div style="margin-bottom:12px"><input class="input" id="authName" placeholder="Nom complet"/></div>`:""}
-    <div style="margin-bottom:12px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username"/></div>
-    <div style="margin-bottom:12px"><input class="input" id="authPass" type="password" placeholder="Mot de passe (6+ caractères)" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()"/></div>
+    ${signup?`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <input class="input" id="authPrenom" placeholder="Prénom"/>
+        <input class="input" id="authNom" placeholder="Nom"/>
+      </div>
+      <div style="margin-bottom:10px"><input class="input" id="authPhone" type="tel" placeholder="Numéro de téléphone (+33…)"/></div>
+      <div style="margin-bottom:10px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username"/></div>
+      <div style="margin-bottom:10px"><input class="input" id="authPass" type="password" placeholder="Mot de passe (6+ caractères)" autocomplete="new-password" onkeydown="if(event.key==='Enter')doAuth()"/></div>
+      <div style="margin-bottom:10px"><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Mon université</label>
+        <select class="input" id="authUniv" onchange="state._signupUniv=this.value;render()">${UNIVS.map(uu=>`<option value="${uu.id}" ${uu.id===univSelected?"selected":""}>${uu.nom}</option>`).join("")}</select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Filière</label><select class="input" id="authFaculte">${(u&&u.facultes||[]).map(f=>`<option value="${f.id}">${f.nom}</option>`).join("")||'<option value="">—</option>'}</select></div>
+        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Année</label><select class="input" id="authAnnee">${["L1","L2","L3"].map(a=>`<option value="${a}">${a}</option>`).join("")}</select></div>
+      </div>
+    `:`
+      <div style="margin-bottom:12px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username"/></div>
+      <div style="margin-bottom:12px"><input class="input" id="authPass" type="password" placeholder="Mot de passe" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()"/></div>
+    `}
     <button class="btn btn-ink" style="width:100%" onclick="doAuth()">${signup?"Créer mon compte":"Se connecter"}</button>
     <div id="authErr" style="color:#B4453A;font-size:13px;min-height:18px;margin-top:8px"></div>
     <div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span class="muted">ou</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
     <button class="btn btn-ghost" style="width:100%" onclick="googleAuth()">Continuer avec Google</button>
-    <p class="muted" style="margin-top:16px">Espace admin : connecte-toi avec l'email <b>${ADMIN_EMAIL}</b>.</p>
+    ${signup?'<p class="muted" style="margin-top:14px;font-size:11px;line-height:1.4">En t\'inscrivant, tu acceptes nos CGU et CGV. Tu recevras un email pour confirmer ton compte.</p>':""}
   </div></div>`;
 }
 /* ===== Footer ===== */
@@ -1609,9 +1743,14 @@ function AdminConsole(){
   const a=state.a;
   let body;
   if(a.view==="univ"){
-    body=`<h2 class="serif" style="font-size:30px;color:var(--ink);margin:0 0 6px">Console admin</h2><p class="muted" style="margin:0 0 24px">Descends dans la structure pour gérer un catalogue précis. Université ▸ filière ▸ niveau ▸ matière.</p>
+    body=`<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;flex-wrap:wrap;gap:10px">
+      <div><h2 class="serif" style="font-size:30px;color:var(--ink);margin:0 0 6px">Console admin</h2><p class="muted" style="margin:0">Descends dans la structure ou consulte les stats.</p></div>
+      <button class="btn btn-ink btn-sm" onclick="state.a.view='stats';render()">📊 Dashboard</button>
+    </div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:32px">${UNIVS.map(u=>`<div class="card ${u.actif?"card-h":""}" style="padding:22px;${u.actif?"":"opacity:.55"}" ${u.actif?`onclick="aPickUniv('${u.id}')"`:""}><div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">${univLogoHTML(u)}${u.actif?'<span class="pill">Disponible</span>':'<span class="tag">Bientôt</span>'}</div><div style="font-weight:600;color:var(--ink);font-size:15px">${u.nom}</div><div class="muted">${u.ville}</div></div>`).join("")}</div>
     ${CategoriesAdmin()}`;
+  } else if(a.view==="stats"){
+    body=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px"><h2 class="serif" style="font-size:28px;color:var(--ink);margin:0">📊 Dashboard</h2><button class="btn btn-ghost btn-sm" onclick="state.a.view='univ';render()">← Retour</button></div>${AdminStatsView()}`;
   } else if(a.view==="fac"){
     body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.univ.nom}</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${a.univ.facultes.map(f=>`<div class="card card-h" style="padding:24px" onclick="aPickFac('${f.id}')"><h3 style="font-size:18px;color:var(--ink);font-weight:600;margin:0 0 6px">${f.nom}</h3><div class="muted">${state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===f.id).length} contenus</div></div>`).join("")}</div>`;
   } else if(a.view==="niv"){
@@ -1625,6 +1764,61 @@ function AdminConsole(){
   return `<div class="wrap fade" style="padding:24px 0 0">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">${aCrumb()}<button class="btn btn-ghost btn-sm" onclick="nav('landing')">Voir le site</button></div>
     ${body}</div>`;
+}
+async function loadAdminStats(){
+  if(!sb)return;
+  state._statsLoading=true;render();
+  try{
+    const adminEmailsArr=[...ADMIN_EMAILS];
+    // Nombre total d'inscrits (excluant admins)
+    const{data:profs}=await sb.from("profiles").select("user_id,prenom,nom,univ,faculte,annee,created_at");
+    // Top viewers (excluant admins)
+    const{data:viewsAll}=await sb.from("views").select("user_id,duration_seconds,contenu_id,updated_at");
+    // Map profile user_id → infos
+    const profMap={};(profs||[]).forEach(p=>{profMap[p.user_id]=p;});
+    // Calcule aggregations
+    const userStats={};(viewsAll||[]).forEach(v=>{const k=v.user_id;if(!userStats[k])userStats[k]={user_id:k,views:0,seconds:0,lastSeen:null};userStats[k].views++;userStats[k].seconds+=v.duration_seconds||0;if(!userStats[k].lastSeen||v.updated_at>userStats[k].lastSeen)userStats[k].lastSeen=v.updated_at;});
+    // Contenus les + vus
+    const cStats={};(viewsAll||[]).forEach(v=>{cStats[v.contenu_id]=(cStats[v.contenu_id]||0)+1;});
+    const topContenus=Object.entries(cStats).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([id,n])=>{const c=state.contenus.find(x=>x.id===id);return{c,n};}).filter(x=>x.c);
+    // Top users (exclu admins)
+    const topUsers=Object.values(userStats).map(u=>({...u,profile:profMap[u.user_id]||null})).filter(u=>{const p=u.profile;return p&&!adminEmailsArr.some(e=>e.toLowerCase()===(p.email||"").toLowerCase());}).sort((a,b)=>b.seconds-a.seconds).slice(0,10);
+    // Compte les inscrits non-admin
+    const totalUsers=(profs||[]).length;
+    state._stats={
+      totalUsers,
+      totalViews:(viewsAll||[]).length,
+      totalHours:Math.round((viewsAll||[]).reduce((s,v)=>s+(v.duration_seconds||0),0)/3600),
+      topUsers,topContenus,
+      loadedAt:Date.now()
+    };
+    state._statsLoading=false;render();
+  }catch(e){console.warn(e);state._statsLoading=false;render();}
+}
+function AdminStatsView(){
+  const s=state._stats;
+  if(!s){if(!state._statsLoading)loadAdminStats();return `<div class="card" style="padding:40px;text-align:center;color:var(--muted)">📊 Chargement des statistiques…</div>`;}
+  return `<div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:22px">
+      <div class="card" style="padding:22px"><div class="muted" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Inscrits (hors admin)</div><div class="serif" style="font-size:36px;color:var(--ink);line-height:1">${s.totalUsers}</div></div>
+      <div class="card" style="padding:22px"><div class="muted" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Vues totales</div><div class="serif" style="font-size:36px;color:var(--ink);line-height:1">${s.totalViews}</div></div>
+      <div class="card" style="padding:22px"><div class="muted" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Heures consommées</div><div class="serif" style="font-size:36px;color:var(--ink);line-height:1">${s.totalHours}h</div></div>
+      <div class="card" style="padding:22px"><div class="muted" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Connectés "live"</div><div class="serif" style="font-size:36px;color:var(--muted);line-height:1">~</div><div class="muted" style="font-size:10.5px;margin-top:4px">(Realtime presence non implémenté Free tier)</div></div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:18px">
+      <div class="card" style="padding:24px">
+        <h3 class="serif" style="font-size:18px;color:var(--ink);margin:0 0 14px">🏆 Top utilisateurs</h3>
+        ${s.topUsers.length?`<div style="display:grid;gap:8px">${s.topUsers.map((u,i)=>{const p=u.profile||{};const nom=((p.prenom||"")+" "+(p.nom||"")).trim()||"(profil incomplet)";return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="width:24px;font-weight:600;color:var(--muted);font-size:13px">${i+1}.</div><div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14px;color:var(--ink)">${esc(nom)}</div><div class="muted">${esc((univById(p.univ)||{}).nom||"—")} · ${esc(p.annee||"")}</div></div><div style="text-align:right"><div style="font-weight:600;font-size:13px">${fmtDuration(u.seconds)}</div><div class="muted">${u.views} vues</div></div></div>`;}).join("")}</div>`:'<div class="muted" style="padding:14px 0">Aucune activité encore.</div>'}
+      </div>
+      <div class="card" style="padding:24px">
+        <h3 class="serif" style="font-size:18px;color:var(--ink);margin:0 0 14px">🔥 Contenus les plus vus</h3>
+        ${s.topContenus.length?`<div style="display:grid;gap:8px">${s.topContenus.map(({c,n},i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="width:24px;font-weight:600;color:var(--muted);font-size:13px">${i+1}.</div><div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.titre||"")}</div><div class="muted">${esc(c.matiere||"")} · ${esc(c.annee||"")}</div></div><div style="text-align:right;font-weight:600">${n} 👁</div></div>`).join("")}</div>`:'<div class="muted" style="padding:14px 0">Aucune vue encore.</div>'}
+      </div>
+    </div>
+
+    <div style="margin-top:18px;text-align:center"><button class="btn btn-ghost btn-sm" onclick="loadAdminStats()">↻ Actualiser les stats</button></div>
+  </div>`;
 }
 function CategoriesAdmin(){
   const cats=allCategories();
@@ -1729,7 +1923,7 @@ function adminListHTML(list){
     const v=parseVideoEmbed(c.video_url);
     return `<div class="card" style="padding:16px;margin-bottom:10px">
       <div style="display:flex;gap:14px;align-items:flex-start">
-        <div class="thumb">${c.thumb?`<img src="${c.thumb}"/>`:(v&&v.thumb?`<img src="${v.thumb}"/>`:(up?"PDF":iconFor(c.type)))}</div>
+        <div class="thumb" ${v?`onclick="openVideoPreview('${esc(c.video_url).replace(/'/g,"\\'")}')" title="Aperçu vidéo"`:""}>${c.thumb?`<img src="${c.thumb}"/>`:(v&&v.thumb?`<img src="${v.thumb}"/>`:(up?"PDF":iconFor(c.type)))}${v?'<div class="play">▶</div>':""}</div>
         <div style="flex:1;min-width:0">
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
             <span class="tag">${isSeed?"Catalogue":(c.file_path?"FICHIER":"VIDÉO")}</span>
@@ -1853,6 +2047,13 @@ async function handleFiles(files){
 }
 async function regen(id){const c=state.contenus.find(x=>x.id===id);if(!c)return;c.outUrl=null;c.qr=null;render();await processRecord(c);render();}
 
+function openVideoPreview(url){
+  const v=parseVideoEmbed(url,true);
+  if(!v){toast("URL vidéo invalide","err");return;}
+  const root=document.getElementById("modalRoot");
+  root.innerHTML=`<div class="video-preview-modal" onclick="closeVideoPreview(event)"><div class="box" onclick="event.stopPropagation()"><button class="close" onclick="closeVideoPreview()">✕</button>${v.kind==="file"?`<video src="${v.embed}" controls autoplay></video>`:`<iframe src="${v.embed}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`}</div></div>`;
+}
+function closeVideoPreview(e){if(e&&e.target&&!e.target.classList.contains("video-preview-modal"))return;const root=document.getElementById("modalRoot");root.innerHTML="";}
 async function uploadCorrige(id,file){
   if(!file)return;
   const c=state.contenus.find(x=>x.id===id);if(!c)return;
@@ -1892,14 +2093,27 @@ async function resolveToken(str){
       }
     }catch(e){console.warn(e);}
   }
-  // 2) Fallback : token générique d'un contenu (tatoué côté admin, pas un download)
+  // 2) Fallback : essaye d'extraire l'email du token (format STUDIA|contenuId|u:email|date|rand)
+  const partsMatch=v.match(/STUDIA\|([a-z0-9]+)\|u:([^|]+)\|([0-9-]+)\|?/i);
+  if(partsMatch){
+    const[,id,email,date]=partsMatch;
+    const c=state.contenus.find(x=>x.id===id);
+    const u=c?univById(c.univ):null,fac=c?facById(c.univ,c.faculte):null;
+    const rows=[["📧 Email viewer",esc(email)],["📅 Date d'ouverture",date],["📄 Sujet",c?esc(c.titre||"—"):"(contenu supprimé)"],["📍 Emplacement",c?`${u?u.ville:""} ▸ ${fac?fac.nom:c.faculte||""} ▸ ${c.annee||""} ▸ ${c.matiere||""} ▸ ${labelFor(c.type)}`:"—"],["🆔 Token",`<span class="token">${esc(v)}</span>`]];
+    out.innerHTML=`<div class="trace-result"><b style="color:#B4453A">🚨 Fuite tracée (parsing token)</b><p class="muted" style="margin:6px 0 8px;font-size:11.5px">Cette ouverture n'a pas été enregistrée en base (utilisateur déconnecté ou erreur réseau), mais le token contient l'email.</p><div style="margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:13px">${rows.map(([k,val])=>`<span style="color:var(--sub)">${k}</span><span>${val}</span>`).join("")}</div></div>`;
+    return;
+  }
+  // 3) Fallback ultime : juste un contenu_id sans user info
   const m=v.match(/STUDIA\|([a-z0-9]+)/i)||v.match(/^([a-z0-9]{6})$/i);
-  const id=m?m[1]:v;
-  const c=state.contenus.find(x=>x.id===id||x.token===v);
-  if(!c){out.innerHTML=`<div class="trace-result miss">Code lu : ${esc(v)} — aucun téléchargement ni contenu connu ne correspond.</div>`;return;}
-  const u=univById(c.univ),fac=facById(c.univ,c.faculte);
-  const rows=[["Compte",c.account||"—"],["Email",c.email||"—"],["Sujet",esc(c.titre||"")],["Emplacement",`${u?u.ville:""} ▸ ${fac?fac.nom:c.faculte} ▸ ${c.annee} ▸ ${c.matiere} ▸ ${labelFor(c.type)}`],["Date",c.date||"—"],["ID",`<span class="token">${c.id}</span>`]];
-  out.innerHTML=`<div class="trace-result"><b>Contenu identifié (pas un téléchargement abonné)</b><div style="margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:13px">${rows.map(([k,val])=>`<span style="color:var(--sub)">${k}</span><span>${val}</span>`).join("")}</div></div>`;
+  if(m){
+    const id=m[1];const c=state.contenus.find(x=>x.id===id);
+    if(c){
+      const u=univById(c.univ),fac=facById(c.univ,c.faculte);
+      out.innerHTML=`<div class="trace-result miss"><b>QR sans info utilisateur</b><p style="margin:6px 0 0;font-size:13px">Ce QR pointe vers <b>${esc(c.titre||"")}</b> (${u?u.ville:""} ▸ ${fac?fac.nom:""} ▸ ${c.matiere||""}) mais ne contient pas l'email du téléchargeur. C'est probablement un QR généré côté admin (preview), pas un téléchargement abonné.</p></div>`;
+      return;
+    }
+  }
+  out.innerHTML=`<div class="trace-result miss">Code lu : ${esc(v)} — token non reconnu.</div>`;
 }
 function traceText(){resolveToken(document.getElementById("ti").value);}
 async function traceImage(input){
