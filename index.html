@@ -6,9 +6,8 @@
 <title>Studia</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://unpkg.com/jsqr@1.4.0/dist/jsQR.js';document.head.appendChild(s);"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
 :root{--bg:#FBFBFA;--surface:#FFFFFF;--border:#EAE9E6;--borderStrong:#DEDDD9;--ink:#1A1A18;--text:#37352F;--sub:#6F6E69;--muted:#9B9A94;--accent:#34C759;--accentDark:#2A9D47;--accentSoft:#E7F8EC;--amber:#9A6A18;--amberSoft:#F6EFDF;--sans:'Geist',-apple-system,BlinkMacSystemFont,sans-serif;--serif:'Instrument Serif',Georgia,serif}
@@ -191,6 +190,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .size-controls button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06)}
 .media-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12px;color:var(--sub)}
 .user-watermark{position:absolute;bottom:8px;right:8px;z-index:3;font-size:11px;color:rgba(0,0,0,.4);background:rgba(255,255,255,.7);padding:3px 8px;border-radius:6px;pointer-events:none;font-weight:500;backdrop-filter:blur(4px)}
+.watermark-mosaic{position:absolute;inset:0;pointer-events:none;z-index:2;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);align-items:center;justify-items:center;opacity:.22;mix-blend-mode:multiply}
+.watermark-mosaic span{color:#1a1a18;font-family:var(--sans);font-weight:700;font-size:14px;transform:rotate(-22deg);white-space:nowrap;text-shadow:0 0 1px #fff}
+.pdf-fullscreen-overlay{position:fixed;inset:0;z-index:1000;background:#1a1a18;display:flex;flex-direction:column;animation:fadeUp .3s ease}
+.pdf-fullscreen-bar{height:54px;background:#000;display:flex;align-items:center;justify-content:space-between;padding:0 16px;color:#fff;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.08)}
+.pdf-fullscreen-body{flex:1;position:relative;overflow:hidden}
+.pdf-fullscreen-body iframe{width:100%;height:100%;border:0}
 .no-screenshot{user-select:none;-webkit-user-select:none}
 .hidden-on-blur{transition:filter .15s ease}
 body.hide-content .hidden-on-blur{filter:blur(28px) saturate(0)}
@@ -1187,9 +1192,26 @@ function MediaPlayer(it,unlocked){
 function openFullscreenPDF(){
   const url=state.mediaTab==="corrige"?state._corrUrl:state._pdfUrl;
   if(!url){toast("PDF pas encore prêt","warn");return;}
-  const w=window.open();
-  if(!w){toast("Pop-up bloqué — autorise les pop-ups","err",4000);return;}
-  w.document.write(`<!DOCTYPE html><html><head><title>${esc(state.item&&state.item.titre||"Studia")}</title><style>body,html{margin:0;padding:0;height:100vh;background:#222}iframe{width:100%;height:100%;border:0}</style></head><body><iframe src="${url}#toolbar=0&navpanes=0&view=FitH"></iframe></body></html>`);
+  state.pdfFullscreen=true;render();
+}
+function closeFullscreenPDF(){state.pdfFullscreen=false;render();}
+function renderFullscreenOverlay(){
+  if(!state.pdfFullscreen||!state.item)return "";
+  const url=state.mediaTab==="corrige"?state._corrUrl:state._pdfUrl;
+  if(!url)return "";
+  const p=state.profile||{};
+  const userLabel=esc(((p.prenom||"")+" "+(p.nom||"")).trim()||(state.user&&state.user.email)||"");
+  return `<div class="pdf-fullscreen-overlay" onkeydown="if(event.key==='Escape')closeFullscreenPDF()">
+    <div class="pdf-fullscreen-bar">
+      <div style="font-weight:600">${esc(state.item.titre||"")}</div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,.7)">Studia · ${userLabel}</div>
+      <button onclick="closeFullscreenPDF()" style="background:rgba(255,255,255,.1);border:none;color:#fff;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:18px">✕</button>
+    </div>
+    <div class="pdf-fullscreen-body">
+      <iframe src="${url}#toolbar=0&navpanes=0&view=FitH"></iframe>
+      <div class="watermark-mosaic">${Array(12).fill(0).map(()=>`<span>Studia · ${userLabel}</span>`).join("")}</div>
+    </div>
+  </div>`;
 }
 function setMediaTab(tab,contenuId){
   state.mediaTab=tab;render();
