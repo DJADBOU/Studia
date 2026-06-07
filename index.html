@@ -222,7 +222,7 @@ function setDbStatus(on,text){
 function showDbStatus(show){const el=document.getElementById("dbStatus");if(el){if(show)el.classList.add("show");else el.classList.remove("show");}}
 async function loadContenus(){if(!sb)return;try{const{data,error}=await sb.from("contenus").select("*");if(!error&&data&&data.length){state.contenus=data.map(r=>({...r,source:r.source||"seed"}));render();}}catch(e){console.warn("loadContenus:",e.message);}}
 async function checkSubscription(){if(!sb||!state.user)return;try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;const{data}=await sb.from("subscribers").select("status").eq("user_id",u.user.id).maybeSingle();if(data&&data.status==="active"){state.subscribed=true;render();}}catch(e){}}
-async function restoreSession(){if(!sb)return;try{const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=data.user.email===ADMIN_EMAIL;state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;showDbStatus(true);render();await checkSubscription();}}catch(e){}}
+async function restoreSession(){if(!sb)return;try{const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=data.user.email===ADMIN_EMAIL;state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;showDbStatus(true);render();await checkSubscription();await loadProfile();render();}}catch(e){}}
 async function loadHiddenMatieres(){if(!sb)return;try{const{data,error}=await sb.from("matieres_hidden").select("*");if(!error&&data){state.hiddenMatieres=new Set(data.map(r=>`${r.univ}|${r.faculte}|${r.annee}|${r.matiere}`));}}catch(e){}}
 async function dbHideMatiere(univ,faculte,annee,matiere){if(!sb)return false;try{const{error}=await sb.from("matieres_hidden").insert({univ,faculte,annee,matiere});if(error){toast("Échec : "+error.message,"err");return false;}toast("Matière masquée","ok");return true;}catch(e){toast("Erreur","err");return false;}}
 function goCheckout(plan){const link=plan==="semestre"?CONFIG.STRIPE_LINK_SEMESTRE:CONFIG.STRIPE_LINK_MENSUEL;if(link){window.location.href=link;}else{state.modal=true;renderModal();}}
@@ -258,6 +258,62 @@ async function dbUploadFile(file,id){
     toast("📁 Fichier uploadé dans le bucket","ok");
     return path;
   }catch(e){console.warn(e);toast("Erreur upload","err");return null;}
+}
+
+/* ===== Profile / Tracking ===== */
+async function loadProfile(){
+  if(!sb||!state.user)return;
+  try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
+    const{data,error}=await sb.from("profiles").select("*").eq("user_id",u.user.id).maybeSingle();
+    if(!error&&data)state.profile=data;
+  }catch(e){console.warn("loadProfile:",e.message);}
+}
+async function saveProfile(fields){
+  if(!sb||!state.user)return{ok:false};
+  try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return{ok:false};
+    const row={user_id:u.user.id,...fields,updated_at:new Date().toISOString()};
+    const{error}=await sb.from("profiles").upsert(row);
+    if(error){toast("Échec sauvegarde profil","err");return{ok:false,error:error.message};}
+    state.profile={...(state.profile||{}),...row};
+    toast("✓ Profil enregistré","ok");return{ok:true};
+  }catch(e){return{ok:false,error:e.message};}
+}
+async function trackView(contenu_id){
+  if(!sb||!state.user||!contenu_id)return;
+  try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
+    // Cherche s'il y a déjà une vue pour ce contenu → update plutôt qu'insert
+    const{data:existing}=await sb.from("views").select("id,duration_seconds").eq("user_id",u.user.id).eq("contenu_id",contenu_id).maybeSingle();
+    if(existing){state._currentView={id:existing.id,base:existing.duration_seconds||0};}
+    else{const{data:ins}=await sb.from("views").insert({user_id:u.user.id,contenu_id,duration_seconds:0}).select("id").single();if(ins)state._currentView={id:ins.id,base:0};}
+  }catch(e){console.warn("trackView:",e.message);}
+}
+async function flushTimeSpent(seconds){
+  if(!sb||!state._currentView||!seconds)return;
+  try{
+    const total=(state._currentView.base||0)+seconds;
+    await sb.from("views").update({duration_seconds:total,updated_at:new Date().toISOString()}).eq("id",state._currentView.id);
+    state._currentView.base=total;
+  }catch(e){}
+}
+async function loadMyStats(){
+  if(!sb||!state.user)return null;
+  try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return null;
+    const{data:views}=await sb.from("views").select("contenu_id,duration_seconds,updated_at").eq("user_id",u.user.id).order("updated_at",{ascending:false});
+    if(!views)return {count:0,seconds:0,recent:[]};
+    const total=views.reduce((s,v)=>s+(v.duration_seconds||0),0);
+    return {count:views.length,seconds:total,recent:views.slice(0,6)};
+  }catch(e){return null;}
+}
+async function lookupDownload(token){
+  if(!sb)return null;
+  try{
+    const{data,error}=await sb.from("downloads").select("*,contenus(*)").eq("token",token).maybeSingle();
+    if(error||!data)return null;
+    // récupère le user via auth si possible (l'admin a la policy admin_read)
+    let userInfo=null;
+    try{const{data:ud}=await sb.auth.admin.getUserById(data.user_id);if(ud)userInfo=ud.user;}catch(e){}
+    return{download:data,user:userInfo,contenu:data.contenus};
+  }catch(e){return null;}
 }
 
 /* ===== utils vidéo ===== */
@@ -296,18 +352,9 @@ const SITE_IMG={
 };
 const UNIVS=[
  {id:"uca",nom:"Université Côte d'Azur",ville:"Nice",actif:true,facultes:[
-   {id:"eg",nom:"Économie & Gestion",mat:{
-     L1:["Microéconomie","Macroéconomie","Mathématiques","Statistiques","Comptabilité générale","Introduction à la gestion"],
-     L2:["Microéconomie 2","Macroéconomie 2","Comptabilité de gestion","Statistiques inférentielles","Mathématiques financières","Droit des affaires"],
-     L3:["Microéconomie approfondie","Économétrie","Analyse financière","Théorie des jeux","Économie publique","Analyse de données"]}},
-   {id:"droit",nom:"Droit",mat:{
-     L1:["Introduction au droit","Droit civil","Droit constitutionnel","Histoire du droit"],
-     L2:["Droit des obligations","Droit administratif","Droit pénal","Droit des affaires"],
-     L3:["Contrats spéciaux","Droit du travail","Droit international","Procédure civile"]}},
-   {id:"maths",nom:"Mathématiques",mat:{
-     L1:["Analyse 1","Algèbre 1","Probabilités","Logique & ensembles"],
-     L2:["Analyse 2","Algèbre linéaire","Statistiques","Topologie"],
-     L3:["Analyse complexe","Algèbre 2","Probabilités avancées","Calcul différentiel"]}},
+   {id:"eg",nom:"Économie & Gestion",mat:{L1:[],L2:[],L3:[]}},
+   {id:"droit",nom:"Droit",mat:{L1:[],L2:[],L3:[]}},
+   {id:"maths",nom:"Mathématiques",mat:{L1:[],L2:[],L3:[]}},
  ]},
  {id:"amu",nom:"Aix-Marseille Université",ville:"Aix-en-Provence",actif:false,facultes:[]},
  {id:"p1",nom:"Paris 1 Panthéon-Sorbonne",ville:"Paris",actif:false,facultes:[]},
@@ -340,28 +387,8 @@ const kindLabel={Cours:"Cours",TD:"TD corrigé",Examen:"Examen corrigé"};
 const kindIcon={Cours:"📘",TD:"▶",Examen:"📝"};
 
 let _uid=0;
-function seedContenus(){
-  const out=[]; let t=0;
-  for(const u of UNIVS){ if(!u.actif)continue;
-    for(const f of u.facultes){
-      for(const annee of ["L1","L2","L3"]){
-        for(const mat of f.mat[annee]){
-          TYPES.forEach((type,k)=>{
-            const [tut,note]=TUTEURS[t++%TUTEURS.length];
-            const titres={Cours:`Cours : ${mat}`,TD:`TD corrigé : ${mat}`,Examen:`Examen corrigé : ${mat}`};
-            out.push({id:"s"+(_uid++),source:"seed",univ:u.id,faculte:f.id,annee,matiere:mat,type,
-              titre:titres[type],tuteur:tut,note,duree:(10+((t*3)%16))+" min",
-              gratuit:(annee==="L1"&&k===0&&f.id==="eg"&&(mat==="Microéconomie"||mat==="Macroéconomie")),
-              ts:Date.now()-(out.length*1000)});
-          });
-        }
-      }
-    }
-  }
-  const fl=out.find(c=>c.univ==="uca"&&c.faculte==="eg"&&c.annee==="L1"&&c.matiere==="Microéconomie"&&c.type==="TD");
-  if(fl){fl.titre="Maximisation de l'utilité sous contrainte";fl.gratuit=true;fl.flagship=true;}
-  return out;
-}
+// Démo data désactivée : le site démarre vide, l'admin remplit via la console.
+function seedContenus(){return [];}
 
 const state={
   view:"landing", univ:null, faculte:null, annee:"L1", matiere:null, tab:"cours", item:null,
@@ -371,6 +398,12 @@ const state={
   newC:{open:false},
   hiddenMatieres:new Set(),
   contenus:seedContenus(),
+  profile:null,
+  myStats:null,
+  _currentView:null,
+  _timer:null,
+  editProfile:false,
+  mcAnnee:null,
 };
 
 /* ===== templates ===== */
@@ -435,13 +468,39 @@ function toggleFounder(i){
 
 /* ===== handlers (public) ===== */
 function nav(v){state.view=v;render();}
+async function goProfile(){
+  state.view="profile";state.menu=false;render();
+  await loadProfile();
+  state.myStats=await loadMyStats();
+  render();
+}
 function goProgramme(){ state.view = state.faculte?"programme":(state.univ?"facultes":"univs"); render(); }
 function selectUniv(id){const u=univById(id);if(!u||!u.actif)return;state.univ=u;state.faculte=null;state.view="facultes";render();}
 function selectFaculte(fid){const f=facById(state.univ.id,fid);if(!f)return;state.faculte=f;state.annee="L1";state.view="programme";render();}
 function pickAnnee(a){state.annee=a;render();}
 function openMatiere(idx){const m=matieresFor(state.univ.id,state.faculte.id,state.annee)[idx];if(m==null)return;state.matiere=m;state.tab="cours";state.view="matiere";render();}
 function setTab(t){state.tab=t;render();}
-function openItem(id){state.item=state.contenus.find(c=>c.id===id);state.view="detail";render();}
+function openItem(id){state.item=state.contenus.find(c=>c.id===id);state.view="detail";render();startViewTimer(id);}
+function startViewTimer(contenu_id){
+  stopViewTimer();
+  trackView(contenu_id);
+  state._timerStart=Date.now();
+  state._timer=setInterval(()=>{
+    // ping toutes les 30s : flush le temps accumulé
+    const elapsed=Math.floor((Date.now()-state._timerStart)/1000);
+    if(elapsed>=30){flushTimeSpent(elapsed);state._timerStart=Date.now();}
+  },30000);
+}
+function stopViewTimer(){
+  if(state._timer){clearInterval(state._timer);state._timer=null;}
+  if(state._timerStart){
+    const elapsed=Math.floor((Date.now()-state._timerStart)/1000);
+    if(elapsed>0)flushTimeSpent(elapsed);
+    state._timerStart=null;
+  }
+  state._currentView=null;
+}
+window.addEventListener("beforeunload",()=>{if(state._timer)stopViewTimer();});
 function setModal(v){state.modal=v;renderModal();}
 function subscribe(){state.subscribed=true;state.modal=false;renderModal();render();}
 function setAuthMode(m){state.authMode=m;render();}
@@ -464,7 +523,13 @@ async function doAuth(){
         if(err){err.style.color="var(--accentDark)";err.textContent="✓ Compte créé. Vérifie ta boîte mail pour confirmer.";}
         return;
       }
-      const isAdmin=email===ADMIN_EMAIL;state.user={email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;state.view=isAdmin?"admin":"univs";state.menu=false;showDbStatus(true);toast(isAdmin?"Connecté en admin":"Bienvenue !","ok");render();checkSubscription();return;
+      const isAdmin=email===ADMIN_EMAIL;state.user={email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;state.menu=false;showDbStatus(true);toast(isAdmin?"Connecté en admin":"Bienvenue !","ok");
+      // Charge profile puis redirige : admin→console, étudiant avec profil→mon espace, sinon→univs
+      if(isAdmin){state.view="admin";render();checkSubscription();loadProfile();return;}
+      await loadProfile();await checkSubscription();
+      state.view=hasProfile()?"mycourses":"univs";
+      if(state.view==="mycourses")loadMyStats().then(s=>{state.myStats=s;render();});
+      render();return;
     }catch(e){if(err)err.textContent=e.message;return;}
   }
   loginStudent(email);
@@ -475,6 +540,7 @@ function logout(){if(sb){try{sb.auth.signOut();}catch(e){}}state.user=null;state
 /* ===== RENDER ===== */
 function render(){
   if(typeof scanStream!=="undefined"&&scanStream)stopScan();
+  if(state.view!=="detail"&&state._timer)stopViewTimer();
   const app=document.getElementById("app");
   if(state.view==="landing"){app.innerHTML=Landing();setTimeout(setupReveals,40);window.scrollTo(0,0);return;}
   if(state.view==="login"){app.innerHTML=Nav()+LoginView()+Footer();window.scrollTo(0,0);return;}
@@ -494,6 +560,8 @@ function render(){
   else if(v==="cgu")h+=CguView();
   else if(v==="cgv")h+=CgvView();
   else if(v==="droits")h+=DroitsView();
+  else if(v==="profile")h+=ProfileView();
+  else if(v==="mycourses")h+=MyCoursesView();
   h+=Footer();
   app.innerHTML=h;
   if(v==="admin"&&state.a.view==="manage")bindAdmin();
@@ -610,20 +678,33 @@ function navRight(){
   let r="";
   if(state.subscribed)r+='<span class="pill" style="margin-left:6px">✓ Abonné</span>';
   else r+='<button class="btn btn-ink btn-sm" style="margin-left:6px" onclick="setModal(true)">S\'abonner</button>';
-  if(state.user){if(state.user.role==="admin")r=`<button class="link ${state.view==="admin"?"on":""}" onclick="nav('admin')">Console</button>`+r;r+='<button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="logout()">Déconnexion</button>';}
+  if(state.user){
+    if(state.user.role==="admin")r=`<button class="link ${state.view==="admin"?"on":""}" onclick="nav('admin')">Console</button>`+r;
+    const p=state.profile||{};
+    const initials=((p.prenom||state.user.email[0])[0]+(p.nom||"")[0]||state.user.email[0]).toUpperCase();
+    r+=`<button title="Mon profil" onclick="goProfile()" style="margin-left:8px;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;border:none;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">${initials}</button>`;
+  }
   else r+='<button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="nav(\'login\')">Connexion</button>';
   return r;
 }
-function MobileMenu(){return `<div class="mobile-menu"><div class="wrap" style="padding-bottom:8px">
-  <button onclick="goProgramme()">Programme</button><button onclick="nav('tarifs')">Tarifs</button><button onclick="nav('tuteur')">Devenir tuteur</button>
-  ${state.user?(state.user.role==="admin"?`<button onclick="nav('admin')">Console</button>`:"")+`<button onclick="logout()">Déconnexion</button>`:`<button onclick="nav('login')">Connexion</button>`}
+function MobileMenu(){
+  const showMyEspace=state.user&&state.user.role!=="admin"&&hasProfile();
+  return `<div class="mobile-menu"><div class="wrap" style="padding-bottom:8px">
+  ${showMyEspace?`<button onclick="goMyCourses()">Mon espace</button>`:""}
+  <button onclick="goProgramme()">${showMyEspace?"Explorer":"Programme"}</button>
+  <button onclick="nav('tarifs')">Tarifs</button>
+  <button onclick="nav('tuteur')">Devenir tuteur</button>
+  ${state.user?`<button onclick="goProfile()">Mon profil</button>`+(state.user.role==="admin"?`<button onclick="nav('admin')">Console</button>`:"")+`<button onclick="logout()">Déconnexion</button>`:`<button onclick="nav('login')">Connexion</button>`}
   ${state.subscribed?"":`<button onclick="setModal(true)">S'abonner</button>`}
 </div></div>`;}
+function hasProfile(){const p=state.profile;return !!(p&&p.univ&&p.faculte);}
 function Nav(){
+  const showMyEspace=state.user&&state.user.role!=="admin"&&hasProfile();
   return `<div class="nav"><div class="wrap nav-in">
     <div onclick="nav('landing')" style="display:flex;align-items:center;gap:8px;cursor:pointer"><div class="logo">S</div><span style="font-weight:600;font-size:17px;color:var(--ink)">Studia</span></div>
     <div class="nav-links">
-      <button class="link ${["univs","facultes","programme","matiere","detail"].includes(state.view)?"on":""}" onclick="goProgramme()">Programme</button>
+      ${showMyEspace?`<button class="link ${state.view==="mycourses"?"on":""}" onclick="goMyCourses()">Mon espace</button>`:""}
+      <button class="link ${["univs","facultes","programme","matiere","detail"].includes(state.view)?"on":""}" onclick="goProgramme()">${showMyEspace?"Explorer":"Programme"}</button>
       <button class="link ${state.view==="tarifs"?"on":""}" onclick="nav('tarifs')">Tarifs</button>
       <button class="link ${state.view==="tuteur"?"on":""}" onclick="nav('tuteur')">Devenir tuteur</button>
       ${navRight()}
@@ -670,6 +751,94 @@ function FacultesView(){
     </div>
   </div>`;
 }
+/* ===== Mon espace (dashboard étudiant personnalisé) ===== */
+function MyCoursesView(){
+  if(!state.user){
+    return `<div class="wrap fade"><div class="page-content"><h1>Connecte-toi pour voir ton espace.</h1><button class="btn btn-ink" onclick="nav('login')">Se connecter</button></div></div>`;
+  }
+  const p=state.profile||{};
+  if(!p.univ||!p.faculte){
+    return `<div class="wrap fade"><div class="page-content"><span class="eyebrow">Ton espace</span><h1>Complète d'abord ton profil.</h1><p>Indique ton université, ta filière et ton année pour qu'on te montre les bons contenus.</p><button class="btn btn-accent" onclick="goProfile()">Compléter mon profil</button></div></div>`;
+  }
+  const u=univById(p.univ), f=facById(p.univ,p.faculte);
+  if(!u||!f){
+    return `<div class="wrap fade"><div class="page-content"><h1>Filière introuvable.</h1><button class="btn btn-ghost" onclick="goProfile()">Modifier mon profil</button></div></div>`;
+  }
+  const annee=state.mcAnnee||p.annee||"L1";
+  const mats=matieresFor(p.univ,p.faculte,annee);
+  const allContenusFilière=state.contenus.filter(c=>c.univ===p.univ&&c.faculte===p.faculte&&c.annee===annee);
+  const recentUploads=allContenusFilière.filter(c=>c.source==="upload").sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,4);
+  const gratuit=allContenusFilière.filter(c=>c.gratuit).slice(0,3);
+  const s=state.myStats||{count:0,seconds:0,recent:[]};
+  const prenom=p.prenom||state.user.email.split("@")[0];
+  return `<div class="wrap fade" style="padding:36px 0;max-width:1080px">
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:18px;margin-bottom:32px">
+      <div>
+        <span class="eyebrow">Mon espace</span>
+        <h1 class="serif" style="font-size:clamp(34px,5vw,52px);color:var(--ink);margin:6px 0 6px;line-height:1.05;letter-spacing:-1px">Bonjour ${esc(prenom)} ✦</h1>
+        <p style="font-size:15px;color:var(--sub);margin:0">${esc(annee)} · <b style="color:var(--ink)">${esc(f.nom)}</b> · ${esc(u.nom)}</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${state.subscribed?'<span class="pill" style="padding:8px 14px">✓ Abonné</span>':'<button class="btn btn-accent" onclick="setModal(true)">S\'abonner</button>'}
+        <button class="btn btn-ghost btn-sm" onclick="goProfile()">Modifier mon profil</button>
+      </div>
+    </div>
+
+    ${s.recent.length?`
+    <div class="card" style="padding:24px 26px;margin-bottom:28px;background:linear-gradient(135deg,#FBFBFA,#F5FBF7);border-color:var(--accent)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span class="eyebrow" style="margin:0">Continue ta progression</span><span class="muted" style="font-size:11.5px">${s.count} ${s.count>1?"contenus suivis":"contenu suivi"} · ${fmtDuration(s.seconds)} étudié</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">
+        ${s.recent.slice(0,3).map(r=>{const c=state.contenus.find(x=>x.id===r.contenu_id);if(!c)return "";return `<div class="card card-h" style="padding:14px;display:flex;align-items:center;gap:12px" onclick="resumeContenu('${c.id}')"><div class="ic">${kindIcon[c.type]||"📄"}</div><div style="flex:1;min-width:0"><div style="font-weight:500;color:var(--ink);font-size:14px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.titre||"")}</div><div class="muted" style="font-size:11.5px">${fmtDuration(r.duration_seconds)} · ${fmtRelativeDate(r.updated_at)}</div></div><span style="color:var(--muted)">▶</span></div>`;}).join("")}
+      </div>
+    </div>`:""}
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:14px;flex-wrap:wrap">
+      <h2 class="serif" style="font-size:24px;color:var(--ink);margin:0">Tes matières en ${annee}</h2>
+      <div class="seg">${["L1","L2","L3"].map(y=>`<button class="${annee===y?"on":""}" onclick="state.mcAnnee='${y}';render()">${y}</button>`).join("")}</div>
+    </div>
+
+    ${mats.length?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));margin-bottom:36px">
+      ${mats.map((m,i)=>{const cours=countMat(p.univ,p.faculte,annee,m,"Cours"),td=countMat(p.univ,p.faculte,annee,m,"TD"),ex=countMat(p.univ,p.faculte,annee,m,"Examen"),total=cours+td+ex;return `<div class="card card-h" style="padding:20px" onclick="goMatiereStudent('${esc(m).replace(/'/g,"\\'")}')">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0;padding-right:8px;line-height:1.3">${esc(m)}</h3><span style="color:var(--muted)">›</span></div>
+        <div style="display:flex;gap:10px;font-size:12.5px;color:var(--sub);flex-wrap:wrap"><span>📘 ${cours} cours</span><span>▶ ${td} TD</span><span>📝 ${ex} ex.</span></div>
+        ${total===0?'<div class="muted" style="margin-top:8px;font-size:11.5px;font-style:italic">À venir</div>':""}
+      </div>`;}).join("")}
+    </div>`:`<div class="card" style="padding:48px;text-align:center;color:var(--muted);margin-bottom:36px">Aucune matière publiée en ${annee} pour ${esc(f.nom)} pour l'instant. Reviens bientôt — l'équipe Studia ajoute du contenu chaque semaine.</div>`}
+
+    ${recentUploads.length?`<div style="margin-bottom:32px">
+      <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 14px">Dernières nouveautés ${annee}</h2>
+      <div style="display:grid;gap:10px">
+        ${recentUploads.map(it=>{const locked=!it.gratuit&&!state.subscribed;return `<div class="card card-h row" onclick="openItemFromMyCourses('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":kindIcon[it.type]}</div><div style="flex:1;min-width:0"><div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span class="tag">${kindLabel[it.type]||it.type}</span><span class="tag">${esc(it.matiere||"")}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}</div><div style="font-size:15px;color:var(--ink);font-weight:500">${esc(it.titre||"")}</div><div class="muted">★ ${esc(it.tuteur||"—")} · ${esc(it.note||"—")}/20${it.duree?" · "+esc(it.duree):""}</div></div><span style="color:var(--muted)">›</span></div>`;}).join("")}
+      </div>
+    </div>`:""}
+
+    ${gratuit.length&&!state.subscribed?`<div class="card" style="padding:24px 26px;background:var(--ink);color:#fff;border:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px">
+        <div><div class="serif" style="font-size:22px;color:#fff;margin-bottom:4px">Débloque tout le programme.</div><p style="color:rgba(255,255,255,.7);margin:0;font-size:14.5px">Pass semestriel à 39 € — accès illimité jusqu'à la fin du semestre.</p></div>
+        <button class="btn btn-accent" onclick="setModal(true)">S'abonner</button>
+      </div>
+    </div>`:""}
+
+  </div>`;
+}
+function goMyCourses(){
+  state.view="mycourses";state.menu=false;render();
+  if(state.user&&!state.myStats)loadMyStats().then(s=>{state.myStats=s;render();});
+}
+function goMatiereStudent(matiere){
+  const p=state.profile;if(!p)return;
+  state.univ=univById(p.univ);state.faculte=facById(p.univ,p.faculte);state.annee=state.mcAnnee||p.annee||"L1";state.matiere=matiere;state.tab="cours";state.view="matiere";render();
+}
+function openItemFromMyCourses(id){
+  const c=state.contenus.find(x=>x.id===id);if(!c)return;
+  state.univ=univById(c.univ);state.faculte=facById(c.univ,c.faculte);state.matiere=c.matiere;state.annee=c.annee;openItem(id);
+}
+function resumeContenu(id){
+  const c=state.contenus.find(x=>x.id===id);if(!c)return;
+  state.univ=univById(c.univ);state.faculte=facById(c.univ,c.faculte);state.matiere=c.matiere;state.annee=c.annee;openItem(id);
+}
+
 /* ===== Programme (niveau + matières) ===== */
 function Programme(){
   const a=state.annee, uid=state.univ.id, fid=state.faculte.id, mats=matieresFor(uid,fid,a);
@@ -773,6 +942,103 @@ function Tuteur(){
   const cr=[["Note ≥ 16/20","Tu dois avoir cartonné dans la matière."],["Correction-test validée","Relue par l'équipe avant publication."],["Contenu 100 % original","Tes propres cours et corrigés — jamais ceux d'un prof."]];
   return `<div class="wrap fade" style="padding:54px 0 0"><div style="max-width:640px"><span class="pill">Rejoins l'équipe</span><h1 class="serif" style="font-size:46px;color:var(--ink);margin:18px 0 16px;line-height:1.05">Aide ta promo, gagne de l'argent, muscle ton CV.</h1><p style="font-size:17px;color:var(--sub);line-height:1.6;margin:0 0 32px">Tu as excellé ? Transmets ta méthode. Rémunéré sur chaque contenu publié, et une vraie ligne d'expérience.</p></div><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:32px">${cr.map(([t,d],i)=>`<div class="card" style="padding:22px"><div class="serif" style="font-size:24px;color:var(--accentDark);margin-bottom:8px">0${i+1}</div><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0 0 6px">${t}</h3><p style="font-size:14px;color:var(--sub);line-height:1.55;margin:0">${d}</p></div>`).join("")}</div><div class="note" style="max-width:720px">⚠️ <div><b>Charte tuteur.</b> Chaque tuteur certifie que son contenu est original et ne reproduit aucun support de cours d'un enseignant. Règle non négociable — et notre protection.</div></div></div>`;
 }
+/* ===== Profile (Mon compte) ===== */
+function fmtDuration(seconds){
+  if(!seconds||seconds<60)return `${seconds||0} s`;
+  const h=Math.floor(seconds/3600), m=Math.floor((seconds%3600)/60);
+  if(h>0)return `${h}h ${m}m`;
+  return `${m} min`;
+}
+function fmtRelativeDate(iso){
+  if(!iso)return "—";
+  const d=new Date(iso), now=new Date();
+  const diff=Math.floor((now-d)/1000);
+  if(diff<60)return "à l'instant";
+  if(diff<3600)return `il y a ${Math.floor(diff/60)} min`;
+  if(diff<86400)return `il y a ${Math.floor(diff/3600)}h`;
+  if(diff<604800)return `il y a ${Math.floor(diff/86400)}j`;
+  return d.toLocaleDateString("fr-FR");
+}
+function ProfileView(){
+  if(!state.user){return `<div class="wrap fade"><div class="page-content"><h1>Connecte-toi pour voir ton profil.</h1><button class="btn btn-ink" onclick="nav('login')">Se connecter</button></div></div>`;}
+  const p=state.profile||{};
+  const s=state.myStats||{count:0,seconds:0,recent:[]};
+  const initials=((p.prenom||state.user.email[0])[0]+(p.nom||"")[0]||state.user.email[0]).toUpperCase();
+  const editing=state.editProfile;
+  const nom=p.nom||"", prenom=p.prenom||"", univ=p.univ||"uca", faculte=p.faculte||"", annee=p.annee||"L1", bio=p.bio||"";
+  return `<div class="wrap fade" style="padding:40px 0;max-width:900px">
+    <div class="card" style="padding:32px;margin-bottom:22px">
+      <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+        <div class="founder-avatar" style="width:88px;height:88px;font-size:30px">${initials}</div>
+        <div style="flex:1;min-width:240px">
+          ${editing?`
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+              <input class="input" id="pPrenom" placeholder="Prénom" value="${esc(prenom)}"/>
+              <input class="input" id="pNom" placeholder="Nom" value="${esc(nom)}"/>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+              <select class="input" id="pUniv">${UNIVS.map(u=>`<option value="${u.id}" ${univ===u.id?"selected":""}>${u.nom}</option>`).join("")}</select>
+              <select class="input" id="pFaculte">${(univById(univ)||{facultes:[]}).facultes.map(f=>`<option value="${f.id}" ${faculte===f.id?"selected":""}>${f.nom}</option>`).join("")}</select>
+              <select class="input" id="pAnnee">${["L1","L2","L3"].map(a=>`<option value="${a}" ${annee===a?"selected":""}>${a}</option>`).join("")}</select>
+            </div>
+            <textarea class="input" id="pBio" rows="2" placeholder="Quelques mots sur toi (optionnel)" style="resize:vertical">${esc(bio)}</textarea>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="btn btn-accent btn-sm" onclick="submitProfile()">Enregistrer</button>
+              <button class="btn btn-ghost btn-sm" onclick="state.editProfile=false;render()">Annuler</button>
+            </div>
+          `:`
+            <h1 class="serif" style="font-size:32px;color:var(--ink);margin:0 0 4px;line-height:1.1">${esc((prenom+" "+nom).trim())||state.user.email.split("@")[0]}</h1>
+            <div class="muted" style="margin-bottom:8px">${esc(state.user.email)}</div>
+            ${p.univ?`<div style="font-size:14px;color:var(--text)"><b>${esc((univById(p.univ)||{}).nom||"")}</b>${p.faculte?" · "+esc(((univById(p.univ)||{facultes:[]}).facultes.find(f=>f.id===p.faculte)||{}).nom||""):""}${p.annee?" · "+p.annee:""}</div>`:'<div class="muted">Profil pas encore complété</div>'}
+            ${p.bio?`<p style="margin:10px 0 0;color:var(--sub);font-size:14px;line-height:1.5">${esc(p.bio)}</p>`:""}
+            <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" onclick="state.editProfile=true;render()">${p.nom?"Modifier mon profil":"Compléter mon profil"}</button>
+              ${state.subscribed?'<span class="pill">✓ Abonné</span>':'<button class="btn btn-accent btn-sm" onclick="setModal(true)">S\'abonner</button>'}
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:22px">
+      <div class="card" style="padding:22px"><div class="muted" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Contenus vus</div><div class="serif" style="font-size:36px;color:var(--ink);line-height:1">${s.count}</div></div>
+      <div class="card" style="padding:22px"><div class="muted" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Temps d'étude</div><div class="serif" style="font-size:36px;color:var(--ink);line-height:1">${fmtDuration(s.seconds)}</div></div>
+      <div class="card" style="padding:22px"><div class="muted" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Dernière session</div><div class="serif" style="font-size:22px;color:var(--ink);line-height:1.2">${s.recent[0]?fmtRelativeDate(s.recent[0].updated_at):"—"}</div></div>
+      <div class="card" style="padding:22px"><div class="muted" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Abonnement</div><div class="serif" style="font-size:22px;color:var(--ink);line-height:1.2">${state.subscribed?'<span style="color:var(--accentDark)">Actif</span>':'<span style="color:var(--muted)">Gratuit</span>'}</div></div>
+    </div>
+
+    <div class="card" style="padding:24px 26px;margin-bottom:22px">
+      <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 14px">Continue ta progression</h2>
+      ${s.recent.length?`<div style="display:grid;gap:10px">${s.recent.map(r=>{const c=state.contenus.find(x=>x.id===r.contenu_id);if(!c)return `<div class="muted" style="padding:10px 0">Contenu indisponible (id ${r.contenu_id})</div>`;return `<div class="card card-h" style="padding:14px 16px;display:flex;align-items:center;gap:14px" onclick="state.item=state.contenus.find(x=>x.id==='${c.id}');state.view='detail';state.univ=univById('${c.univ}');state.faculte=facById('${c.univ}','${c.faculte}');state.matiere='${esc(c.matiere).replace(/'/g,"\\'")}';render()"><div class="ic">${kindIcon[c.type]||"📄"}</div><div style="flex:1;min-width:0"><div style="font-weight:500;color:var(--ink);font-size:14.5px;margin-bottom:2px">${esc(c.titre||"")}</div><div class="muted">${kindLabel[c.type]||c.type} · ${esc(c.matiere||"")} · ${fmtDuration(r.duration_seconds)} étudié · ${fmtRelativeDate(r.updated_at)}</div></div><span style="color:var(--muted)">›</span></div>`;}).join("")}</div>`:'<div class="muted" style="padding:14px 0">Tu n\'as pas encore ouvert de contenu. Vas dans le <a onclick="nav(\'univs\')" style="color:var(--accentDark);cursor:pointer">Programme</a> pour commencer.</div>'}
+    </div>
+
+    <div class="card" style="padding:24px 26px">
+      <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 14px">Mon compte</h2>
+      <div style="display:grid;gap:10px;font-size:14.5px;color:var(--text)">
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span class="muted">Email</span><span>${esc(state.user.email)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span class="muted">Rôle</span><span>${state.user.role==="admin"?"Admin":"Étudiant"}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0"><span class="muted">Abonnement</span><span>${state.subscribed?'<span style="color:var(--accentDark);font-weight:500">Actif</span>':"Pas d'abonnement"}</span></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="changePassword()">Changer mon mot de passe</button>
+        <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="logout()">Déconnexion</button>
+      </div>
+    </div>
+  </div>`;
+}
+async function submitProfile(){
+  const get=id=>(document.getElementById(id)||{}).value||"";
+  const fields={prenom:get("pPrenom").trim(),nom:get("pNom").trim(),univ:get("pUniv"),faculte:get("pFaculte"),annee:get("pAnnee"),bio:get("pBio").trim()};
+  const r=await saveProfile(fields);
+  if(r.ok){state.editProfile=false;render();}
+}
+async function changePassword(){
+  const newPass=prompt("Nouveau mot de passe (6+ caractères) :");
+  if(!newPass||newPass.length<6){alert("Mot de passe trop court.");return;}
+  if(!sb){alert("Pas de connexion.");return;}
+  try{const{error}=await sb.auth.updateUser({password:newPass});if(error){toast(error.message,"err");return;}toast("✓ Mot de passe changé","ok");}catch(e){toast("Erreur","err");}
+}
+
 /* ===== Pages info / légal ===== */
 function AboutView(){
   return `<div class="wrap fade"><div class="page-content">
@@ -1158,16 +1424,34 @@ async function handleFiles(files){
 async function regen(id){const c=state.contenus.find(x=>x.id===id);if(!c)return;c.outUrl=null;c.qr=null;render();await processRecord(c);render();}
 
 var scanStream=null, scanRAF=null;
-function resolveToken(str){
+async function resolveToken(str){
   const out=document.getElementById("to"); if(!out)return;
   const v=(str||"").trim(); if(!v){out.innerHTML="";return;}
+  out.innerHTML=`<div class="trace-result">🔍 Recherche en cours…</div>`;
+  // 1) Cherche dans la table downloads (vrai téléchargement abonné)
+  if(sb){
+    try{
+      const{data}=await sb.from("downloads").select("*,contenus(*)").eq("token",v).maybeSingle();
+      if(data){
+        const c=data.contenus||{};
+        const u=univById(c.univ),fac=facById(c.univ,c.faculte);
+        // récupère l'email du user qui a téléchargé
+        let userEmail="(inconnu)";
+        try{const{data:p}=await sb.from("profiles").select("prenom,nom").eq("user_id",data.user_id).maybeSingle();if(p)userEmail=`${p.prenom||""} ${p.nom||""}`.trim()||"(profil incomplet)";}catch(e){}
+        const rows=[["⚠ FUITE TRACÉE","abonné identifié"],["User ID",`<span class="token">${data.user_id}</span>`],["Nom",esc(userEmail)],["Sujet",esc(c.titre||"—")],["Emplacement",`${u?u.ville:""} ▸ ${fac?fac.nom:c.faculte||""} ▸ ${c.annee||""} ▸ ${c.matiere||""} ▸ ${kindLabel[c.type]||c.type||""}`],["Téléchargé le",new Date(data.downloaded_at).toLocaleString("fr-FR")]];
+        out.innerHTML=`<div class="trace-result"><b style="color:#B4453A">🚨 Fuite tracée à un abonné</b><div style="margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:13px">${rows.map(([k,val])=>`<span style="color:var(--sub)">${k}</span><span>${val}</span>`).join("")}</div></div>`;
+        return;
+      }
+    }catch(e){console.warn(e);}
+  }
+  // 2) Fallback : token générique d'un contenu (tatoué côté admin, pas un download)
   const m=v.match(/STUDIA\|([a-z0-9]+)/i)||v.match(/^([a-z0-9]{6})$/i);
   const id=m?m[1]:v;
   const c=state.contenus.find(x=>x.id===id||x.token===v);
-  if(!c){out.innerHTML=`<div class="trace-result miss">Code lu : ${esc(v)} — aucun contenu de cette session ne correspond. (Avec le backend : recherche dans toute la base.)</div>`;return;}
-  const u=univById(c.univ), fac=facById(c.univ,c.faculte);
-  const rows=[["Compte",c.account||"—"],["Email",c.email||"—"],["Sujet",esc(c.titre)],["Emplacement",`${u?u.ville:""} ▸ ${fac?fac.nom:c.faculte} ▸ ${c.annee} ▸ ${c.matiere} ▸ ${kindLabel[c.type]}`],["Date",c.date||"—"],["ID",`<span class="token">${c.id}</span>`]];
-  out.innerHTML=`<div class="trace-result"><b>Fuite tracée ✓</b><div style="margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:13px">${rows.map(([k,val])=>`<span style="color:var(--sub)">${k}</span><span>${val}</span>`).join("")}</div><div class="muted" style="margin-top:8px">Email/IP réels = liés à l'abonné au moment du téléchargement (backend).</div></div>`;
+  if(!c){out.innerHTML=`<div class="trace-result miss">Code lu : ${esc(v)} — aucun téléchargement ni contenu connu ne correspond.</div>`;return;}
+  const u=univById(c.univ),fac=facById(c.univ,c.faculte);
+  const rows=[["Compte",c.account||"—"],["Email",c.email||"—"],["Sujet",esc(c.titre||"")],["Emplacement",`${u?u.ville:""} ▸ ${fac?fac.nom:c.faculte} ▸ ${c.annee} ▸ ${c.matiere} ▸ ${kindLabel[c.type]||""}`],["Date",c.date||"—"],["ID",`<span class="token">${c.id}</span>`]];
+  out.innerHTML=`<div class="trace-result"><b>Contenu identifié (pas un téléchargement abonné)</b><div style="margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:13px">${rows.map(([k,val])=>`<span style="color:var(--sub)">${k}</span><span>${val}</span>`).join("")}</div></div>`;
 }
 function traceText(){resolveToken(document.getElementById("ti").value);}
 async function traceImage(input){
