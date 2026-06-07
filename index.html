@@ -330,6 +330,7 @@ async function downloadProtected(id){
 /* ===== Supabase : persistance contenus ===== */
 function dbRow(c){
   return {id:c.id,source:c.source||"upload",univ:c.univ,faculte:c.faculte,annee:c.annee,matiere:c.matiere,type:c.type,
+    semestre:c.semestre||"S1",
     titre:c.titre,tuteur:c.tuteur,note:c.note,duree:c.duree,gratuit:!!c.gratuit,flagship:!!c.flagship,
     file_path:c.file_path||null,corrige_path:c.corrige_path||null,
     video_url:c.video_url||null,video_corrige_url:c.video_corrige_url||null,
@@ -662,6 +663,8 @@ const state={
   _corrUrl:null,_corrStatus:null,
   pdfSize:"normal",
   categories:[],
+  pdfFullscreen:false,
+  semestre:"S1",
 };
 
 /* ===== templates ===== */
@@ -674,9 +677,10 @@ const coursTpl=t=>[`Le cœur de « ${t} » résumé sans remplissage.`,"Les conc
 /* ===== derived ===== */
 const univById=id=>UNIVS.find(u=>u.id===id);
 const facById=(uid,fid)=>{const u=univById(uid);return u&&u.facultes.find(f=>f.id===fid);};
-const matieresFor=(uid,fid,annee)=>{const f=facById(uid,fid);const m1=(f&&f.mat&&f.mat[annee])?f.mat[annee]:[];const m2=state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee).map(c=>c.matiere);return[...new Set([...m1,...m2])].filter(m=>!state.hiddenMatieres.has(`${uid}|${fid}|${annee}|${m}`))};
-const countMat=(uid,fid,annee,m,type)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type).length;
-const itemsFor=(uid,fid,annee,m,type)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type);
+function semestreMatch(c,sem){if(!sem)return true;return (c.semestre||"S1")===sem;}
+const matieresFor=(uid,fid,annee,sem)=>{const f=facById(uid,fid);const m1=(f&&f.mat&&f.mat[annee])?f.mat[annee]:[];const m2=state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&semestreMatch(c,sem)).map(c=>c.matiere);return[...new Set([...m1,...m2])].filter(m=>!state.hiddenMatieres.has(`${uid}|${fid}|${annee}|${m}`))};
+const countMat=(uid,fid,annee,m,type,sem)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type&&semestreMatch(c,sem)).length;
+const itemsFor=(uid,fid,annee,m,type,sem)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type&&semestreMatch(c,sem));
 const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
 function univLogoHTML(u){
   const url=UNIV_LOGOS[u.id];
@@ -844,9 +848,19 @@ function render(){
   else if(v==="mycourses")h+=MyCoursesView();
   h+=Footer();
   app.innerHTML=h;
+  // Render des overlays (plein écran PDF par-dessus tout)
+  if(state.pdfFullscreen){
+    let ov=document.getElementById("pdfFullOverlay");
+    if(!ov){ov=document.createElement("div");ov.id="pdfFullOverlay";document.body.appendChild(ov);}
+    ov.innerHTML=renderFullscreenOverlay();
+  }else{
+    const ov=document.getElementById("pdfFullOverlay");if(ov)ov.remove();
+  }
   if(v==="admin"&&state.a.view==="manage")bindAdmin();
   window.scrollTo(0,0);
 }
+// Escape ferme le plein écran
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&state.pdfFullscreen)closeFullscreenPDF();});
 
 /* ===== Landing ===== */
 function Landing(){
@@ -1045,8 +1059,9 @@ function MyCoursesView(){
     return `<div class="wrap fade"><div class="page-content"><h1>Filière introuvable.</h1><button class="btn btn-ghost" onclick="goProfile()">Modifier mon profil</button></div></div>`;
   }
   const annee=state.mcAnnee||p.annee||"L1";
-  const mats=matieresFor(p.univ,p.faculte,annee);
-  const allContenusFilière=state.contenus.filter(c=>c.univ===p.univ&&c.faculte===p.faculte&&c.annee===annee);
+  const sem=state.semestre||"S1";
+  const mats=matieresFor(p.univ,p.faculte,annee,sem);
+  const allContenusFilière=state.contenus.filter(c=>c.univ===p.univ&&c.faculte===p.faculte&&c.annee===annee&&semestreMatch(c,sem));
   const recentUploads=allContenusFilière.filter(c=>c.source==="upload").sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,4);
   const gratuit=allContenusFilière.filter(c=>c.gratuit).slice(0,3);
   const s=state.myStats||{count:0,seconds:0,recent:[]};
@@ -1074,12 +1089,15 @@ function MyCoursesView(){
     </div>`:""}
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:14px;flex-wrap:wrap">
-      <h2 class="serif" style="font-size:24px;color:var(--ink);margin:0">Tes matières en ${annee}</h2>
-      <div class="seg">${["L1","L2","L3"].map(y=>`<button class="${annee===y?"on":""}" onclick="state.mcAnnee='${y}';render()">${y}</button>`).join("")}</div>
+      <h2 class="serif" style="font-size:24px;color:var(--ink);margin:0">Tes matières en ${annee} · ${sem}</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="seg">${["L1","L2","L3"].map(y=>`<button class="${annee===y?"on":""}" onclick="state.mcAnnee='${y}';render()">${y}</button>`).join("")}</div>
+        <div class="seg">${["S1","S2"].map(s=>`<button class="${sem===s?"on":""}" onclick="state.semestre='${s}';render()">${s}</button>`).join("")}</div>
+      </div>
     </div>
 
     ${mats.length?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));margin-bottom:36px">
-      ${mats.map((m,i)=>{const cats=allCategories();const counts=cats.map(c=>({c,n:countMat(p.univ,p.faculte,annee,m,c.id)}));const total=counts.reduce((s,x)=>s+x.n,0);return `<div class="card card-h" style="padding:20px" onclick="goMatiereStudent('${esc(m).replace(/'/g,"\\'")}')">
+      ${mats.map((m,i)=>{const cats=allCategories();const counts=cats.map(c=>({c,n:countMat(p.univ,p.faculte,annee,m,c.id,sem)}));const total=counts.reduce((s,x)=>s+x.n,0);return `<div class="card card-h" style="padding:20px" onclick="goMatiereStudent('${esc(m).replace(/'/g,"\\'")}')">
         <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0;padding-right:8px;line-height:1.3">${esc(m)}</h3><span style="color:var(--muted)">›</span></div>
         <div style="display:flex;gap:8px;font-size:12px;color:var(--sub);flex-wrap:wrap">${counts.map(({c,n})=>`<span>${c.icon} ${n}</span>`).join("")}</div>
         ${total===0?'<div class="muted" style="margin-top:8px;font-size:11.5px;font-style:italic">À venir</div>':""}
@@ -1121,30 +1139,32 @@ function resumeContenu(id){
 
 /* ===== Programme (niveau + matières) ===== */
 function Programme(){
-  const a=state.annee, uid=state.univ.id, fid=state.faculte.id, mats=matieresFor(uid,fid,a);
+  const a=state.annee, sem=state.semestre||"S1", uid=state.univ.id, fid=state.faculte.id, mats=matieresFor(uid,fid,a,sem);
   return `<div class="wrap fade" style="padding:36px 0 0">
     <h1 class="serif" style="font-size:40px;color:var(--ink);margin:0 0 6px">${state.faculte.nom}</h1>
-    <p style="font-size:15px;color:var(--sub);margin:0 0 24px">Choisis ton niveau, puis ta matière.</p>
-    <div class="seg" style="margin-bottom:28px">${["L1","L2","L3"].map(y=>`<button class="${a===y?"on":""}" onclick="pickAnnee('${y}')">${y}</button>`).join("")}</div>
-    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">
+    <p style="font-size:15px;color:var(--sub);margin:0 0 24px">Choisis ton niveau, ton semestre, puis ta matière.</p>
+    <div style="display:flex;gap:14px;margin-bottom:28px;flex-wrap:wrap">
+      <div class="seg">${["L1","L2","L3"].map(y=>`<button class="${a===y?"on":""}" onclick="pickAnnee('${y}')">${y}</button>`).join("")}</div>
+      <div class="seg">${["S1","S2"].map(s=>`<button class="${sem===s?"on":""}" onclick="state.semestre='${s}';render()">${s}</button>`).join("")}</div>
+    </div>
+    ${mats.length?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">
       ${mats.map((m,i)=>`<div class="card card-h" style="padding:20px" onclick="openMatiere(${i})">
         <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:14px"><h3 style="font-size:17px;color:var(--ink);font-weight:600;margin:0;max-width:200px">${m}</h3><span style="color:var(--muted)">›</span></div>
-        <div style="display:flex;gap:10px;font-size:12.5px;color:var(--sub);flex-wrap:wrap">${allCategories().map(c=>`<span>${c.icon} ${countMat(uid,fid,a,m,c.id)}</span>`).join("")}</div>
+        <div style="display:flex;gap:10px;font-size:12.5px;color:var(--sub);flex-wrap:wrap">${allCategories().map(c=>`<span>${c.icon} ${countMat(uid,fid,a,m,c.id,sem)}</span>`).join("")}</div>
       </div>`).join("")}
-    </div>
+    </div>`:`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucune matière en ${a} · ${sem}.</div>`}
   </div>`;
 }
 /* ===== Matiere ===== */
 function MatiereView(){
-  const {annee,matiere}=state, uid=state.univ.id, fid=state.faculte.id;
+  const {annee,matiere}=state, sem=state.semestre||"S1", uid=state.univ.id, fid=state.faculte.id;
   const cats=allCategories();
-  // tab stocke directement l'id de catégorie
   const tab=state.tab&&cats.find(c=>c.id===state.tab)?state.tab:(cats[0]&&cats[0].id||"Cours");
-  const items=itemsFor(uid,fid,annee,matiere,tab);
+  const items=itemsFor(uid,fid,annee,matiere,tab,sem);
   return `<div class="wrap fade" style="padding:30px 0 0">
-    <button class="btn btn-ghost btn-sm" style="border:none;padding:0;color:var(--sub);margin-bottom:16px" onclick="nav('programme')">← ${state.faculte.nom} · ${annee}</button>
+    <button class="btn btn-ghost btn-sm" style="border:none;padding:0;color:var(--sub);margin-bottom:16px" onclick="nav('programme')">← ${state.faculte.nom} · ${annee} · ${sem}</button>
     <h1 class="serif" style="font-size:38px;color:var(--ink);margin:0 0 20px">${matiere}</h1>
-    <div class="tabs">${cats.map(c=>`<button class="${tab===c.id?"on":""}" onclick="setTab('${c.id}')">${esc(c.label)} <span style="color:var(--muted);font-weight:400">${countMat(uid,fid,annee,matiere,c.id)}</span></button>`).join("")}</div>
+    <div class="tabs">${cats.map(c=>`<button class="${tab===c.id?"on":""}" onclick="setTab('${c.id}')">${esc(c.label)} <span style="color:var(--muted);font-weight:400">${countMat(uid,fid,annee,matiere,c.id,sem)}</span></button>`).join("")}</div>
     <div style="max-width:760px">${items.length?items.map(it=>{
       const locked=!it.gratuit&&!state.subscribed&&!isAdminUser();
       return `<div class="card card-h row" onclick="openItem('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":iconFor(it.type)}</div>
@@ -1655,7 +1675,7 @@ function openNewCategory(){
 }
 function AdminManage(){
   const a=state.a, o=state.opt;
-  let list=itemsFor(a.univ.id,a.fac.id,a.niv,a.mat,a.tab).slice();
+  let list=itemsFor(a.univ.id,a.fac.id,a.niv,a.mat,a.tab,state.semestre||"S1").slice();
   if(a.sort==="recent")list.sort((x,y)=>(y.ts||0)-(x.ts||0));
   else if(a.sort==="az")list.sort((x,y)=>x.titre.localeCompare(y.titre));
   const modeSeg=[["coin","Coin"],["bandeau","Bandeau bas"],["mosaique","Mosaïque (fond)"]];
@@ -1664,8 +1684,9 @@ function AdminManage(){
       <div class="card" style="padding:20px">
         <div class="muted" style="margin-bottom:4px">Upload dans</div>
         <div style="font-weight:600;color:var(--ink);font-size:15px;margin-bottom:2px">${a.mat}</div>
-        <div class="muted" style="margin-bottom:14px">${a.univ.ville} · ${a.fac.nom} · ${a.niv} · <b style="color:var(--accentDark)">${labelFor(a.tab)}</b></div>
-        <div class="dz" id="dz"><strong>Dépose un fichier PDF / image</strong><br/><span style="font-size:12px">stocké dans le bucket privé + tatoué</span><input type="file" id="fi" accept="image/*,application/pdf" multiple style="display:none"/></div>
+        <div class="muted" style="margin-bottom:10px">${a.univ.ville} · ${a.fac.nom} · ${a.niv} · <b style="color:var(--accentDark)">${labelFor(a.tab)}</b> · <b style="color:var(--accentDark)">${state.semestre||"S1"}</b></div>
+        <div class="seg sm" style="margin-bottom:14px">${["S1","S2"].map(s=>`<button class="${(state.semestre||"S1")===s?"on":""}" onclick="state.semestre='${s}';render()">${s}</button>`).join("")}</div>
+        <div class="dz" id="dz"><strong>Dépose un fichier PDF / image</strong><br/><span style="font-size:12px">stocké dans le bucket privé + tatoué — semestre <b>${state.semestre||"S1"}</b></span><input type="file" id="fi" accept="image/*,application/pdf" multiple style="display:none"/></div>
       </div>
       <div class="card" style="padding:20px;margin-top:14px">
         <h3 style="font-size:15px;color:var(--ink);font-weight:600;margin:0 0 12px">Placement du QR</h3>
@@ -1710,11 +1731,12 @@ function adminListHTML(list){
       <div style="display:flex;gap:14px;align-items:flex-start">
         <div class="thumb">${c.thumb?`<img src="${c.thumb}"/>`:(v&&v.thumb?`<img src="${v.thumb}"/>`:(up?"PDF":iconFor(c.type)))}</div>
         <div style="flex:1;min-width:0">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
             <span class="tag">${isSeed?"Catalogue":(c.file_path?"FICHIER":"VIDÉO")}</span>
             ${c.date?`<span class="tag">${c.date}</span>`:""}
             ${v?`<span class="pill">▶ ${v.kind}</span>`:""}
             ${c.gratuit?'<span class="pill">Gratuit</span>':""}
+            <select onchange="updField('${c.id}','semestre',this.value)" style="font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid var(--borderStrong);background:#fff">${["S1","S2"].map(s=>`<option value="${s}" ${(c.semestre||"S1")===s?"selected":""}>${s}</option>`).join("")}</select>
           </div>
           <input class="input" style="padding:7px 10px;font-size:13.5px;font-weight:500;margin-bottom:8px" value="${esc(c.titre)}" oninput="updField('${c.id}','titre',this.value)" placeholder="Titre du contenu"/>
           <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:8px">
@@ -1742,7 +1764,7 @@ function adminListHTML(list){
     </div>`;
   }).join("");
 }
-function aRefreshList(){const el=document.getElementById("aList");if(!el)return;const a=state.a;let list=itemsFor(a.univ.id,a.fac.id,a.niv,a.mat,a.tab).slice();if(a.sort==="recent")list.sort((x,y)=>(y.ts||0)-(x.ts||0));else if(a.sort==="az")list.sort((x,y)=>x.titre.localeCompare(y.titre));el.innerHTML=adminListHTML(list);}
+function aRefreshList(){const el=document.getElementById("aList");if(!el)return;const a=state.a;let list=itemsFor(a.univ.id,a.fac.id,a.niv,a.mat,a.tab,state.semestre||"S1").slice();if(a.sort==="recent")list.sort((x,y)=>(y.ts||0)-(x.ts||0));else if(a.sort==="az")list.sort((x,y)=>x.titre.localeCompare(y.titre));el.innerHTML=adminListHTML(list);}
 
 const _updTimers={};
 function updField(id,k,v){
@@ -1814,6 +1836,7 @@ async function handleFiles(files){
     const kind=file.type==="application/pdf"?"pdf":(file.type.startsWith("image/")?"image":null);if(!kind)continue;
     const c={id:genId(),source:"upload",kind,file,
       univ:a.univ.id,faculte:a.fac.id,annee:a.niv,matiere:a.mat,type:a.tab,
+      semestre:state.semestre||"S1",
       account:ACCOUNT,email:(state.user&&state.user.email)||ADMIN_EMAIL,date:today(),ts:Date.now(),
       titre:file.name,tuteur:"—",note:"—",duree:"",gratuit:false,qr:null,outUrl:null,thumb:null,error:null,
       file_path:null,video_url:null,description:null};
@@ -1927,6 +1950,7 @@ async function saveNewContenu(){
   const c={
     id:genId(),source:"upload",
     univ:a.univ.id,faculte:a.fac.id,annee:a.niv,matiere:a.mat,
+    semestre:get("ncSemestre")||state.semestre||"S1",
     type:get("ncType")||a.tab,
     titre,tuteur:get("ncTuteur")||"—",note:get("ncNote")||"—",duree:get("ncDuree")||"",
     video_url:get("ncVideo").trim()||null,
@@ -1950,8 +1974,12 @@ function renderNewContenu(){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><h3 class="serif" style="font-size:22px;color:var(--ink);margin:0">Nouveau contenu</h3><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px" onclick="closeNewContenu()">✕</button></div>
     <div class="muted" style="margin-bottom:14px">${a.univ.ville} · ${a.fac.nom} · ${a.niv} · <b style="color:var(--accentDark)">${a.mat}</b></div>
     <div style="display:grid;gap:10px">
-      <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Type</label>
-        <select class="input" id="ncType">${typeIds().map(t=>`<option value="${t}" ${a.tab===t?"selected":""}>${labelFor(t)}</option>`).join("")}</select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Type</label>
+          <select class="input" id="ncType">${typeIds().map(t=>`<option value="${t}" ${a.tab===t?"selected":""}>${labelFor(t)}</option>`).join("")}</select></div>
+        <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Semestre</label>
+          <select class="input" id="ncSemestre">${["S1","S2"].map(s=>`<option value="${s}" ${(state.semestre||"S1")===s?"selected":""}>${s}</option>`).join("")}</select></div>
+      </div>
       <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Titre *</label>
         <input class="input" id="ncTitre" placeholder="Ex. Maximisation de l'utilité sous contrainte"/></div>
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px">
