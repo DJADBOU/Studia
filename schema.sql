@@ -34,6 +34,8 @@ create table if not exists contenus (
 -- Migration sur une base déjà créée :
 alter table contenus add column if not exists video_url text;
 alter table contenus add column if not exists description text;
+alter table contenus add column if not exists corrige_path text;
+alter table contenus add column if not exists video_corrige_url text;
 alter table contenus enable row level security;
 
 drop policy if exists "contenus_gratuits_publics" on contenus;
@@ -109,8 +111,126 @@ create policy "assets_admin_delete" on storage.objects
   for delete to authenticated
   using (bucket_id = 'assets' and auth.jwt() ->> 'email' = 'djad@studia.app');
 
+-- 6) Profils utilisateurs (créés à l'inscription, complétés par l'étudiant)
+create table if not exists profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  prenom text,
+  nom text,
+  univ text,
+  faculte text,
+  annee text,
+  avatar_url text,
+  bio text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table profiles enable row level security;
+
+drop policy if exists "profiles_self_read" on profiles;
+create policy "profiles_self_read" on profiles
+  for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists "profiles_admin_read" on profiles;
+create policy "profiles_admin_read" on profiles
+  for select to authenticated using (auth.jwt() ->> 'email' = 'djad@studia.app');
+
+drop policy if exists "profiles_self_upsert" on profiles;
+create policy "profiles_self_upsert" on profiles
+  for insert to authenticated with check (user_id = auth.uid());
+
+drop policy if exists "profiles_self_update" on profiles;
+create policy "profiles_self_update" on profiles
+  for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- 7) Vues : tracking des contenus consultés + temps passé
+create table if not exists views (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  contenu_id text not null,
+  duration_seconds int default 0,
+  completed boolean default false,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+create index if not exists views_user_idx on views(user_id);
+create index if not exists views_contenu_idx on views(contenu_id);
+alter table views enable row level security;
+
+drop policy if exists "views_self_read" on views;
+create policy "views_self_read" on views
+  for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists "views_admin_read" on views;
+create policy "views_admin_read" on views
+  for select to authenticated using (auth.jwt() ->> 'email' = 'djad@studia.app');
+
+drop policy if exists "views_self_insert" on views;
+create policy "views_self_insert" on views
+  for insert to authenticated with check (user_id = auth.uid());
+
+drop policy if exists "views_self_update" on views;
+create policy "views_self_update" on views
+  for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- 8) Téléchargements : lie chaque token QR → user qui a téléchargé
+create table if not exists downloads (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  contenu_id text not null,
+  token text unique not null,
+  downloaded_at timestamptz default now()
+);
+create index if not exists downloads_token_idx on downloads(token);
+alter table downloads enable row level security;
+
+-- l'admin peut tout lire (pour la traçabilité des fuites)
+drop policy if exists "downloads_admin_read" on downloads;
+create policy "downloads_admin_read" on downloads
+  for select to authenticated using (auth.jwt() ->> 'email' = 'djad@studia.app');
+
+-- l'utilisateur peut voir ses propres téléchargements
+drop policy if exists "downloads_self_read" on downloads;
+create policy "downloads_self_read" on downloads
+  for select to authenticated using (user_id = auth.uid());
+
+-- l'edge function "download" insère avec service_role (bypass RLS)
+-- mais on autorise quand même l'utilisateur connecté à insérer son propre row
+drop policy if exists "downloads_self_insert" on downloads;
+create policy "downloads_self_insert" on downloads
+  for insert to authenticated with check (user_id = auth.uid());
+
+-- 9) Commentaires sur les contenus (Q/R entre étudiants)
+create table if not exists comments (
+  id bigserial primary key,
+  contenu_id text not null,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  texte text not null,
+  created_at timestamptz default now()
+);
+create index if not exists comments_contenu_idx on comments(contenu_id);
+alter table comments enable row level security;
+
+drop policy if exists "comments_public_read" on comments;
+create policy "comments_public_read" on comments
+  for select using (true);
+
+drop policy if exists "comments_auth_insert" on comments;
+create policy "comments_auth_insert" on comments
+  for insert to authenticated with check (user_id = auth.uid());
+
+drop policy if exists "comments_self_delete" on comments;
+create policy "comments_self_delete" on comments
+  for delete to authenticated using (user_id = auth.uid() or auth.jwt() ->> 'email' = 'djad@studia.app');
+
 -- Storage policies pour "sujets" : bucket privé, seul l'admin upload/lit
 -- (l'edge function "download" utilise la clé service_role qui bypass la RLS)
+-- Pour permettre l'affichage inline aux abonnés, on autorise les select aux users actifs :
+drop policy if exists "sujets_subscriber_select" on storage.objects;
+create policy "sujets_subscriber_select" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'sujets' and exists (
+    select 1 from subscribers s where s.user_id = auth.uid() and s.status = 'active'
+  ));
 drop policy if exists "sujets_admin_select" on storage.objects;
 create policy "sujets_admin_select" on storage.objects
   for select to authenticated
