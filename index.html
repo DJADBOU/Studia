@@ -177,6 +177,33 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .sec-title{font-family:var(--serif);font-size:clamp(28px,3.5vw,40px);color:var(--ink);margin:0 0 10px;line-height:1.1;letter-spacing:-.5px}
 .sec-lead{font-size:16px;color:var(--sub);line-height:1.6;margin:0 0 32px;max-width:560px}
 
+/* Détail contenu — players & commentaires */
+.player-wrap{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:16/9}
+.player-wrap iframe,.player-wrap video,.player-wrap embed{width:100%;height:100%;border:0;display:block}
+.pdf-wrap{position:relative;border-radius:14px;overflow:hidden;background:#F4F3EE;border:1px solid var(--border);height:80vh;min-height:520px;max-height:920px}
+.pdf-wrap iframe,.pdf-wrap embed{width:100%;height:100%;border:0;display:block}
+.pdf-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:13px;background:var(--bg)}
+.watermark-overlay{position:absolute;inset:0;pointer-events:none;z-index:2;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(5,1fr);align-items:center;justify-items:center;opacity:.18;user-select:none}
+.watermark-overlay span{color:var(--ink);font-family:var(--sans);font-weight:600;font-size:13px;transform:rotate(-22deg);white-space:nowrap}
+.no-screenshot{user-select:none;-webkit-user-select:none}
+.hidden-on-blur{transition:filter .15s ease}
+body.hide-content .hidden-on-blur{filter:blur(28px) saturate(0)}
+body.hide-content .hidden-on-blur::after{content:"⛔ Capture détectée — l'écran a été masqué";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(0,0,0,.85);font-weight:600;font-size:14px;z-index:99}
+.media-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:24px 0 16px}
+.media-tabs button{background:none;border:none;font-size:14px;padding:10px 16px;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.media-tabs button.on{color:var(--ink);font-weight:600;border-bottom-color:var(--accent)}
+.comments{margin-top:36px;border-top:1px solid var(--border);padding-top:30px}
+.comment{display:flex;gap:12px;padding:16px 0;border-bottom:1px solid var(--border)}
+.comment:last-child{border-bottom:none}
+.comment-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;overflow:hidden}
+.comment-body{flex:1;min-width:0}
+.comment-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px}
+.comment-name{font-weight:600;color:var(--ink);font-size:14px}
+.comment-time{color:var(--muted);font-size:12px}
+.comment-text{font-size:14.5px;color:var(--text);line-height:1.55;margin:0;white-space:pre-wrap}
+.comment-form{display:flex;gap:10px;align-items:flex-start;padding:18px;border-radius:12px;background:#F8F8F5;border:1px solid var(--border);margin-bottom:18px}
+.comment-form textarea{flex:1;border:none;background:transparent;font-size:14.5px;font-family:inherit;outline:none;resize:vertical;min-height:60px;color:var(--ink)}
+
 /* Page placeholder (légal, contact) */
 .page-content{max-width:760px;padding:60px 0}
 .page-content h1{font-family:var(--serif);font-size:42px;color:var(--ink);margin:0 0 18px;line-height:1.1}
@@ -242,12 +269,14 @@ async function downloadProtected(id){
 function dbRow(c){
   return {id:c.id,source:c.source||"upload",univ:c.univ,faculte:c.faculte,annee:c.annee,matiere:c.matiere,type:c.type,
     titre:c.titre,tuteur:c.tuteur,note:c.note,duree:c.duree,gratuit:!!c.gratuit,flagship:!!c.flagship,
-    file_path:c.file_path||null,video_url:c.video_url||null,description:c.description||null,
+    file_path:c.file_path||null,corrige_path:c.corrige_path||null,
+    video_url:c.video_url||null,video_corrige_url:c.video_corrige_url||null,
+    description:c.description||null,
     account:c.account||ACCOUNT,email:c.email||(state.user&&state.user.email)||null,date:c.date||today(),ts:c.ts||Date.now()};
 }
 async function dbInsertContenu(c){if(!sb){toast("Pas de connexion DB","warn");return{ok:false,offline:true};}try{const{error}=await sb.from("contenus").insert(dbRow(c));if(error){console.warn("insert:",error.message);toast("Échec sauvegarde : "+error.message,"err",5000);return{ok:false,error:error.message};}toast("Contenu créé en base","ok");return{ok:true};}catch(e){toast("Erreur : "+e.message,"err");return{ok:false,error:e.message};}}
 async function dbUpdateContenu(id,fields){if(!sb)return;try{const{error}=await sb.from("contenus").update(fields).eq("id",id);if(error){console.warn("update:",error.message);toast("Échec sauvegarde champ","err");}else{toast("✓ Modif enregistrée","ok",1500);}}catch(e){console.warn(e);toast("Erreur DB","err");}}
-async function dbDeleteContenu(id,file_path){if(!sb)return;try{if(file_path){try{await sb.storage.from("sujets").remove([file_path]);}catch(e){}}const{error}=await sb.from("contenus").delete().eq("id",id);if(error){console.warn("delete:",error.message);toast("Échec suppression","err");}else{toast("Contenu supprimé","ok");}}catch(e){console.warn(e);toast("Erreur DB","err");}}
+async function dbDeleteContenu(id,file_path,corrige_path){if(!sb)return;try{const paths=[file_path,corrige_path].filter(Boolean);if(paths.length){try{await sb.storage.from("sujets").remove(paths);}catch(e){}}const{error}=await sb.from("contenus").delete().eq("id",id);if(error){console.warn("delete:",error.message);toast("Échec suppression","err");}else{toast("Contenu supprimé","ok");}}catch(e){console.warn(e);toast("Erreur DB","err");}}
 async function dbUploadFile(file,id){
   if(!sb){toast("Pas de connexion Storage","warn");return null;}
   try{
@@ -316,14 +345,135 @@ async function lookupDownload(token){
   }catch(e){return null;}
 }
 
+/* ===== Commentaires ===== */
+async function loadComments(contenu_id){
+  if(!sb)return [];
+  try{
+    const{data}=await sb.from("comments").select("*").eq("contenu_id",contenu_id).order("created_at",{ascending:false});
+    if(!data)return [];
+    // enrichit avec prénom/nom du profil
+    const userIds=[...new Set(data.map(c=>c.user_id))];
+    if(!userIds.length)return data;
+    const{data:profs}=await sb.from("profiles").select("user_id,prenom,nom").in("user_id",userIds);
+    const pMap=Object.fromEntries((profs||[]).map(p=>[p.user_id,p]));
+    return data.map(c=>({...c,profile:pMap[c.user_id]||null}));
+  }catch(e){return [];}
+}
+async function postComment(contenu_id,texte){
+  if(!sb||!state.user)return{ok:false};
+  try{
+    const{data:u}=await sb.auth.getUser();if(!u||!u.user)return{ok:false};
+    const{error}=await sb.from("comments").insert({contenu_id,user_id:u.user.id,texte});
+    if(error){toast("Échec : "+error.message,"err");return{ok:false};}
+    toast("✓ Commentaire publié","ok");return{ok:true};
+  }catch(e){return{ok:false};}
+}
+async function deleteComment(id){
+  if(!sb)return;
+  if(!confirm("Supprimer ce commentaire ?"))return;
+  try{const{error}=await sb.from("comments").delete().eq("id",id);if(error){toast(error.message,"err");return;}toast("Commentaire supprimé","ok");state.comments=(state.comments||[]).filter(c=>c.id!==id);render();}catch(e){}
+}
+async function submitComment(contenu_id){
+  const t=document.getElementById("commentTexte");
+  if(!t)return;
+  const v=t.value.trim();
+  if(!v){toast("Écris quelque chose d'abord","warn");return;}
+  const r=await postComment(contenu_id,v);
+  if(r.ok){t.value="";state.comments=await loadComments(contenu_id);render();}
+}
+
+/* ===== PDF per-user watermark ===== */
+async function fetchPDFFromBucket(file_path){
+  if(!sb)return null;
+  try{
+    // sujets est privé → on génère un signed URL (1h)
+    const{data,error}=await sb.storage.from("sujets").createSignedUrl(file_path,3600);
+    if(error||!data)return null;
+    const res=await fetch(data.signedUrl);
+    if(!res.ok)return null;
+    return await res.blob();
+  }catch(e){return null;}
+}
+function makeUserToken(contenu_id){
+  const uid=state.user?(state.user.email||"anonymous"):"anonymous";
+  const d=today();
+  const rand=Math.random().toString(36).slice(2,6);
+  return `STUDIA|${contenu_id}|u:${uid}|${d}|${rand}`;
+}
+async function watermarkPDFBlob(blob,token,opt){
+  const doc=await PDFLib.PDFDocument.load(await blob.arrayBuffer(),{ignoreEncryption:true});
+  const qrDataUrl=await makeQR(token,256);
+  const png=await doc.embedPng(await (await fetch(qrDataUrl)).arrayBuffer());
+  const o=opt||{mode:"mosaique",sizePct:7,opacity:.18};
+  doc.getPages().forEach(p=>{const{width:W,height:H}=p.getSize();const min=Math.min(W,H),s=Math.max(20,min*o.sizePct/100),pad=min*.03;
+    if(o.mode==="mosaique"){const gap=s*2.2;for(let y=pad;y<H;y+=gap)for(let x=pad;x<W;x+=gap)p.drawImage(png,{x,y,width:s,height:s,opacity:o.opacity});}
+    else{let x=pad,y=H-s-pad;p.drawImage(png,{x,y,width:s,height:s,opacity:o.opacity});}
+  });
+  return new Blob([await doc.save()],{type:"application/pdf"});
+}
+async function preparePDFForView(contenu,filePath){
+  if(!filePath)return;
+  state._pdfStatus="loading";render();
+  try{
+    const blob=await fetchPDFFromBucket(filePath);
+    if(!blob){state._pdfStatus="error";render();return;}
+    const token=makeUserToken(contenu.id);
+    const wm=await watermarkPDFBlob(blob,token);
+    const url=URL.createObjectURL(wm);
+    state._pdfUrl=url;state._pdfToken=token;state._pdfStatus="ready";
+    // log dans downloads pour traçabilité
+    if(sb&&state.user){
+      try{const{data:u}=await sb.auth.getUser();if(u&&u.user)await sb.from("downloads").insert({user_id:u.user.id,contenu_id:contenu.id,token});}catch(e){}
+    }
+    render();
+  }catch(e){console.warn(e);state._pdfStatus="error";render();}
+}
+function disposePDF(){
+  if(state._pdfUrl){URL.revokeObjectURL(state._pdfUrl);state._pdfUrl=null;}
+  state._pdfStatus=null;state._pdfToken=null;
+  // dispose aussi le corrigé
+  if(state._corrUrl){URL.revokeObjectURL(state._corrUrl);state._corrUrl=null;}
+  state._corrStatus=null;
+}
+async function prepareCorrigeForView(contenu,corrigePath){
+  if(!corrigePath)return;
+  state._corrStatus="loading";render();
+  try{
+    const blob=await fetchPDFFromBucket(corrigePath);
+    if(!blob){state._corrStatus="error";render();return;}
+    const token=makeUserToken(contenu.id+"_corr");
+    const wm=await watermarkPDFBlob(blob,token);
+    state._corrUrl=URL.createObjectURL(wm);state._corrStatus="ready";render();
+  }catch(e){state._corrStatus="error";render();}
+}
+
+/* ===== Anti-capture (best-effort web) ===== */
+let _antiCaptureInit=false;
+function initAntiCapture(){
+  if(_antiCaptureInit)return;_antiCaptureInit=true;
+  document.addEventListener("visibilitychange",()=>{
+    if(document.hidden&&document.querySelector(".hidden-on-blur"))document.body.classList.add("hide-content");
+    else setTimeout(()=>document.body.classList.remove("hide-content"),200);
+  });
+  document.addEventListener("keydown",e=>{
+    // macOS screenshot: Cmd+Shift+3/4/5  | Windows: PrintScreen
+    if((e.metaKey&&e.shiftKey&&["3","4","5"].includes(e.key))||e.key==="PrintScreen"){
+      document.body.classList.add("hide-content");
+      setTimeout(()=>document.body.classList.remove("hide-content"),2000);
+    }
+  });
+  document.addEventListener("contextmenu",e=>{if(e.target.closest(".pdf-wrap,.player-wrap"))e.preventDefault();});
+}
+
 /* ===== utils vidéo ===== */
-function parseVideoEmbed(url){
+function parseVideoEmbed(url,autoplay){
   if(!url)return null;
   const u=url.trim();
+  const a=autoplay?1:0;
   let m=u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/);
-  if(m)return{kind:"youtube",embed:`https://www.youtube.com/embed/${m[1]}?rel=0`,thumb:`https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg`};
+  if(m)return{kind:"youtube",embed:`https://www.youtube-nocookie.com/embed/${m[1]}?rel=0&modestbranding=1&playsinline=1&autoplay=${a}&mute=${a}`,thumb:`https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg`};
   m=u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  if(m)return{kind:"vimeo",embed:`https://player.vimeo.com/video/${m[1]}`,thumb:null};
+  if(m)return{kind:"vimeo",embed:`https://player.vimeo.com/video/${m[1]}?autoplay=${a}&muted=${a}`,thumb:null};
   if(/\.(mp4|webm|mov|m4v)(\?|$)/i.test(u))return{kind:"file",embed:u,thumb:null};
   return null;
 }
@@ -404,6 +554,10 @@ const state={
   _timer:null,
   editProfile:false,
   mcAnnee:null,
+  comments:[],
+  mediaTab:"sujet",
+  _pdfUrl:null,_pdfStatus:null,_pdfToken:null,
+  _corrUrl:null,_corrStatus:null,
 };
 
 /* ===== templates ===== */
@@ -424,6 +578,14 @@ function univLogoHTML(u){
   const url=UNIV_LOGOS[u.id];
   if(url)return `<div class="ulogo"><img src="${url}" alt="${esc(u.nom)}" onerror="const p=this.parentElement;p.classList.add('fallback');p.innerHTML='${u.nom[0]}'"/></div>`;
   return `<div class="ulogo fallback">${u.nom[0]}</div>`;
+}
+function getInitials(p,user){
+  const prenom=((p&&p.prenom)||"").trim();
+  const nom=((p&&p.nom)||"").trim();
+  if(prenom&&nom)return (prenom[0]+nom[0]).toUpperCase();
+  if(prenom)return prenom.slice(0,2).toUpperCase();
+  if(user&&user.email)return user.email.slice(0,2).toUpperCase();
+  return "?";
 }
 
 /* ===== Stats / Animations ===== */
@@ -480,7 +642,19 @@ function selectFaculte(fid){const f=facById(state.univ.id,fid);if(!f)return;stat
 function pickAnnee(a){state.annee=a;render();}
 function openMatiere(idx){const m=matieresFor(state.univ.id,state.faculte.id,state.annee)[idx];if(m==null)return;state.matiere=m;state.tab="cours";state.view="matiere";render();}
 function setTab(t){state.tab=t;render();}
-function openItem(id){state.item=state.contenus.find(c=>c.id===id);state.view="detail";render();startViewTimer(id);}
+async function openItem(id){
+  const c=state.contenus.find(x=>x.id===id);if(!c)return;
+  disposePDF();
+  state.item=c;state.view="detail";state.mediaTab="sujet";state.comments=[];
+  render();
+  startViewTimer(id);
+  initAntiCapture();
+  // Charge le PDF si l'utilisateur a le droit
+  const unlocked=c.gratuit||state.subscribed||(state.user&&state.user.role==="admin");
+  if(unlocked&&c.file_path&&!c.video_url)preparePDFForView(c,c.file_path);
+  // Charge les commentaires
+  if(sb){loadComments(c.id).then(cmts=>{state.comments=cmts;render();});}
+}
 function startViewTimer(contenu_id){
   stopViewTimer();
   trackView(contenu_id);
@@ -541,6 +715,7 @@ function logout(){if(sb){try{sb.auth.signOut();}catch(e){}}state.user=null;state
 function render(){
   if(typeof scanStream!=="undefined"&&scanStream)stopScan();
   if(state.view!=="detail"&&state._timer)stopViewTimer();
+  if(state.view!=="detail"&&(state._pdfUrl||state._corrUrl))disposePDF();
   const app=document.getElementById("app");
   if(state.view==="landing"){app.innerHTML=Landing();setTimeout(setupReveals,40);window.scrollTo(0,0);return;}
   if(state.view==="login"){app.innerHTML=Nav()+LoginView()+Footer();window.scrollTo(0,0);return;}
@@ -680,9 +855,8 @@ function navRight(){
   else r+='<button class="btn btn-ink btn-sm" style="margin-left:6px" onclick="setModal(true)">S\'abonner</button>';
   if(state.user){
     if(state.user.role==="admin")r=`<button class="link ${state.view==="admin"?"on":""}" onclick="nav('admin')">Console</button>`+r;
-    const p=state.profile||{};
-    const initials=((p.prenom||state.user.email[0])[0]+(p.nom||"")[0]||state.user.email[0]).toUpperCase();
-    r+=`<button title="Mon profil" onclick="goProfile()" style="margin-left:8px;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;border:none;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center">${initials}</button>`;
+    const initials=getInitials(state.profile,state.user);
+    r+=`<button title="Mon profil" onclick="goProfile()" style="margin-left:8px;width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;border:none;font-weight:700;font-size:13px;line-height:1;letter-spacing:-.3px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;padding:0;text-align:center">${initials}</button>`;
   }
   else r+='<button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="nav(\'login\')">Connexion</button>';
   return r;
@@ -872,33 +1046,81 @@ function MatiereView(){
   </div>`;
 }
 /* ===== Detail ===== */
-function Detail(){
-  const it=state.item, unlocked=it.gratuit||state.subscribed, isCours=it.type==="Cours", isUpload=it.source==="upload";
-  const labels=isCours?COURS:CORR;
-  const sections=isUpload?null:(it.flagship?flagship:(isCours?coursTpl(it.titre):corrTpl(it.titre)));
-  const vlabel=isCours?"Cours vidéo":"Correction vidéo";
-  const v=parseVideoEmbed(it.video_url);
-  let media;
-  if(v&&unlocked){
-    if(v.kind==="file"){
-      media=`<div style="aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000"><video src="${v.embed}" controls style="width:100%;height:100%"></video></div>`;
-    }else{
-      media=`<div style="aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000"><iframe src="${v.embed}" style="width:100%;height:100%;border:0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`;
-    }
-  }else if(v&&!unlocked){
-    media=`<div style="aspect-ratio:16/9;border-radius:14px;border:1px solid var(--border);background:#111;display:flex;align-items:center;justify-content:center;color:#fff;position:relative;overflow:hidden">${v.thumb?`<img src="${v.thumb}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(8px) brightness(.5)"/>`:""}<div style="text-align:center;padding:20px;position:relative"><div style="font-size:24px;margin-bottom:10px">🔒</div><div style="margin-bottom:14px">${vlabel} réservée aux abonnés</div><button class="btn btn-accent" onclick="setModal(true)">S'abonner pour débloquer</button></div></div>`;
-  }else if(isUpload){
-    media=`<div class="card" style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;overflow:hidden;background:${it.thumb?"#111":"#F2F1EE"}">${unlocked?(it.thumb?`<img src="${it.thumb}" style="max-width:100%;max-height:100%;object-fit:contain"/>`:`<div style="text-align:center;color:var(--sub)"><div style="font-size:30px">📄</div>Document PDF</div>`):`<div style="text-align:center;color:#fff"><div style="font-size:24px;margin-bottom:10px">🔒</div><div style="margin-bottom:14px">Sujet réservé aux abonnés</div><button class="btn btn-accent" onclick="setModal(true)">S'abonner</button></div>`}</div>`;
-  }else{
-    media=`<div style="aspect-ratio:16/9;border-radius:14px;border:1px solid var(--border);background:#111;display:flex;align-items:center;justify-content:center;color:#fff">${unlocked?`<div style="text-align:center"><div style="font-size:30px;opacity:.8">▶</div><div class="muted" style="color:rgba(255,255,255,.7)">${vlabel} · ${it.duree||""}</div></div>`:`<div style="text-align:center;padding:20px"><div style="font-size:24px;margin-bottom:10px">🔒</div><div style="margin-bottom:14px">${vlabel} réservée aux abonnés</div><button class="btn btn-accent" onclick="setModal(true)">S'abonner pour débloquer</button></div>`}</div>`;
+function watermarkOverlay(){
+  if(!state.user)return "";
+  const p=state.profile||{};
+  const label=esc(((p.prenom||"")+" "+(p.nom||"")).trim()||state.user.email);
+  const cells=Array(15).fill(0).map(()=>`<span>STUDIA · ${label}</span>`).join("");
+  return `<div class="watermark-overlay">${cells}</div>`;
+}
+function MediaPlayer(it,unlocked){
+  const v=parseVideoEmbed(it.video_url,true);
+  const vC=parseVideoEmbed(it.video_corrige_url,true);
+  const tab=state.mediaTab||"sujet";
+  const isCours=it.type==="Cours";
+  const hasCorrige=!!(it.corrige_path||vC);
+  const tabsHTML=hasCorrige?`<div class="media-tabs"><button class="${tab==='sujet'?'on':''}" onclick="setMediaTab('sujet','${it.id}')">📄 ${isCours?'Cours':'Sujet'}</button><button class="${tab==='corrige'?'on':''}" onclick="setMediaTab('corrige','${it.id}')">✓ Corrigé</button></div>`:"";
+  const useVideo=tab==="sujet"?v:vC;
+  const usePdfPath=tab==="sujet"?it.file_path:it.corrige_path;
+  const useUrl=tab==="sujet"?state._pdfUrl:state._corrUrl;
+  const useStatus=tab==="sujet"?state._pdfStatus:state._corrStatus;
+  if(!unlocked){
+    const thumb=v&&v.thumb;
+    return `${tabsHTML}<div class="player-wrap" style="background:#111;display:flex;align-items:center;justify-content:center;color:#fff;position:relative">${thumb?`<img src="${thumb}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(10px) brightness(.4)"/>`:""}<div style="text-align:center;padding:24px;position:relative;z-index:1"><div style="font-size:32px;margin-bottom:10px">🔒</div><div style="margin-bottom:16px;font-size:15px">Contenu réservé aux abonnés</div><button class="btn btn-accent btn-lg" onclick="setModal(true)">S'abonner — 9 €/mois</button></div></div>`;
   }
-  return `<div class="wrap fade" style="padding:30px 0 0;max-width:760px">
+  if(useVideo){
+    const playerSrc=useVideo.kind==="file"?`<video src="${useVideo.embed}" controls autoplay muted></video>`:`<iframe src="${useVideo.embed}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    return `${tabsHTML}<div class="player-wrap hidden-on-blur">${playerSrc}${watermarkOverlay()}</div>`;
+  }
+  if(usePdfPath){
+    if(useStatus==="loading")return `${tabsHTML}<div class="pdf-wrap hidden-on-blur"><div class="pdf-loading">📄 Préparation du document tatoué à ton compte…</div></div>`;
+    if(useStatus==="error")return `${tabsHTML}<div class="pdf-wrap"><div class="pdf-loading" style="color:#B4453A">❌ Impossible de charger le fichier. Recharge la page.</div></div>`;
+    if(useUrl)return `${tabsHTML}<div class="pdf-wrap hidden-on-blur no-screenshot"><iframe src="${useUrl}#toolbar=0&navpanes=0"></iframe>${watermarkOverlay()}</div>`;
+    return `${tabsHTML}<div class="pdf-wrap"><div class="pdf-loading">Chargement…</div></div>`;
+  }
+  return `${tabsHTML}<div class="player-wrap" style="background:#F2F1EE;display:flex;align-items:center;justify-content:center;color:var(--sub)"><div style="text-align:center;padding:24px">📄 Aucun média pour cette section</div></div>`;
+}
+function setMediaTab(tab,contenuId){
+  state.mediaTab=tab;render();
+  const it=state.item;if(!it)return;
+  if(tab==="corrige"&&it.corrige_path&&!state._corrUrl&&state._corrStatus!=="loading")prepareCorrigeForView(it,it.corrige_path);
+  if(tab==="sujet"&&it.file_path&&!state._pdfUrl&&state._pdfStatus!=="loading")preparePDFForView(it,it.file_path);
+}
+function Detail(){
+  const it=state.item;
+  if(!it)return `<div class="wrap"><p>Contenu introuvable.</p></div>`;
+  const unlocked=it.gratuit||state.subscribed||state.user&&state.user.role==="admin";
+  const isCours=it.type==="Cours";
+  const hasCorrige=!!(it.corrige_path||it.video_corrige_url);
+  const desc=it.description||"";
+  const v=parseVideoEmbed(it.video_url);
+  return `<div class="wrap fade" style="padding:30px 0 0;max-width:980px">
     <button class="btn btn-ghost btn-sm" style="border:none;padding:0;color:var(--sub);margin-bottom:18px" onclick="nav('matiere')">← Retour à la matière</button>
-    <div style="display:flex;gap:8px;margin-bottom:12px"><span class="tag">${kindLabel[it.type]}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}</div>
-    <h1 class="serif" style="font-size:34px;color:var(--ink);margin:0 0 10px;line-height:1.1">${it.titre}</h1>
-    <div class="muted" style="margin-bottom:24px">🎓 ${it.tuteur} · ${it.note!=="—"?"major à "+it.note+"/20":"contenu ajouté"}${it.duree?" · "+it.duree:""}</div>
-    ${media}${state.subscribed&&CONFIG.FUNCTIONS_URL&&it.file_path?`<button class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="downloadProtected('${it.id}')">⬇ Télécharger (tatoué à ton compte)</button>`:""}
-    <div style="position:relative;margin-top:28px">${isUpload?`<div class="card" style="padding:22px;color:var(--text);font-size:15px;line-height:1.65">${it.description?esc(it.description).replace(/\n/g,"<br/>"):"Contenu ajouté par l'équipe Studia."}${unlocked&&it.outUrl?`<div style="margin-top:14px"><a class="token" href="${it.outUrl}" download="${it.outName}">⬇ Télécharger le sujet</a></div>`:""}</div>`:sections.map((b,i)=>{const hide=!unlocked&&i>=2;return `<div style="margin-bottom:24px"><div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><span class="serif" style="font-size:18px;color:var(--muted)">${i+1}</span><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0">${labels[i]}</h3>${!isCours&&i===3?'<span class="tag amber">le + utile</span>':""}</div><p style="font-size:15px;color:var(--text);line-height:1.65;margin:0;padding-left:28px;${hide?"filter:blur(5px);user-select:none":""}">${b}</p></div>`;}).join("")}${!isUpload&&!unlocked?`<div style="position:absolute;left:0;right:0;bottom:0;height:200px;background:linear-gradient(to bottom,rgba(251,251,250,0),var(--bg) 78%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:14px"><div style="text-align:center"><div style="font-size:14px;color:var(--sub);margin-bottom:12px">${isCours?"Cours complet réservé aux abonnés":"Méthode, pièges et barème réservés aux abonnés"}</div><button class="btn btn-accent" onclick="setModal(true)">Débloquer</button></div></div>`:""}</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap"><span class="tag">${kindLabel[it.type]||""}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}${hasCorrige?'<span class="pill">+ Corrigé</span>':""}${v?`<span class="pill">▶ Vidéo</span>`:""}</div>
+    <h1 class="serif" style="font-size:clamp(28px,4vw,40px);color:var(--ink);margin:0 0 10px;line-height:1.1;letter-spacing:-.5px">${esc(it.titre||"")}</h1>
+    <div class="muted" style="margin-bottom:22px">🎓 ${esc(it.tuteur||"—")}${it.note&&it.note!=="—"?" · major à "+esc(it.note)+"/20":""}${it.duree?" · "+esc(it.duree):""}</div>
+
+    ${MediaPlayer(it,unlocked)}
+
+    ${desc?`<div class="card" style="padding:22px 24px;margin-top:22px;background:#F8FBF8;border-color:var(--accent)">
+      <div class="eyebrow" style="margin-bottom:8px">Description</div>
+      <div style="font-size:15.5px;color:var(--text);line-height:1.7;white-space:pre-wrap">${esc(desc)}</div>
+    </div>`:""}
+
+    ${state.subscribed&&it.file_path?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="downloadProtected('${it.id}')">⬇ Télécharger le sujet (tatoué à toi)</button>
+      ${it.corrige_path?`<button class="btn btn-ghost btn-sm" onclick="downloadProtected('${it.id}_corr')">⬇ Télécharger le corrigé (tatoué)</button>`:""}
+    </div>`:""}
+
+    ${unlocked?`<div class="comments">
+      <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 16px">Questions &amp; commentaires <span class="muted" style="font-size:13px">(${(state.comments||[]).length})</span></h2>
+      ${state.user?`<div class="comment-form">
+        <div class="comment-avatar">${getInitials(state.profile,state.user)}</div>
+        <textarea id="commentTexte" placeholder="Pose ta question sur ce ${isCours?"cours":"sujet"} ou partage une astuce…"></textarea>
+        <button class="btn btn-accent btn-sm" onclick="submitComment('${it.id}')">Publier</button>
+      </div>`:`<div class="card" style="padding:16px;margin-bottom:14px"><a style="color:var(--accentDark);cursor:pointer;font-weight:500" onclick="nav('login')">Connecte-toi</a> pour poser une question.</div>`}
+      ${(state.comments||[]).length?(state.comments||[]).map(c=>{const cp=c.profile||{};const nom=((cp.prenom||"")+" "+(cp.nom||"")).trim()||"Anonyme";const init=getInitials(cp,{email:""})||"?";const isMine=state.user&&c.user_id&&state.user.email;return `<div class="comment"><div class="comment-avatar">${esc(init)}</div><div class="comment-body"><div class="comment-head"><span class="comment-name">${esc(nom)}</span><span class="comment-time">${fmtRelativeDate(c.created_at)}</span></div><p class="comment-text">${esc(c.texte||"")}</p>${(isMine||(state.user&&state.user.role==="admin"))?`<button onclick="deleteComment(${c.id})" style="background:none;border:none;color:var(--muted);font-size:11.5px;padding:6px 0 0;cursor:pointer">Supprimer</button>`:""}</div></div>`;}).join(""):'<div class="muted" style="padding:24px 0;text-align:center">Aucun commentaire pour l\'instant. Sois le premier à lancer la discussion.</div>'}
+    </div>`:""}
   </div>`;
 }
 /* ===== Tarifs / Tuteur ===== */
@@ -963,7 +1185,7 @@ function ProfileView(){
   if(!state.user){return `<div class="wrap fade"><div class="page-content"><h1>Connecte-toi pour voir ton profil.</h1><button class="btn btn-ink" onclick="nav('login')">Se connecter</button></div></div>`;}
   const p=state.profile||{};
   const s=state.myStats||{count:0,seconds:0,recent:[]};
-  const initials=((p.prenom||state.user.email[0])[0]+(p.nom||"")[0]||state.user.email[0]).toUpperCase();
+  const initials=getInitials(p,state.user);
   const editing=state.editProfile;
   const nom=p.nom||"", prenom=p.prenom||"", univ=p.univ||"uca", faculte=p.faculte||"", annee=p.annee||"L1", bio=p.bio||"";
   return `<div class="wrap fade" style="padding:40px 0;max-width:900px">
@@ -1319,10 +1541,14 @@ function adminListHTML(list){
             <input class="input" style="padding:7px 10px;font-size:12.5px" value="${esc(c.note||'')}" oninput="updField('${c.id}','note',this.value)" placeholder="Note/20"/>
             <input class="input" style="padding:7px 10px;font-size:12.5px" value="${esc(c.duree||'')}" oninput="updField('${c.id}','duree',this.value)" placeholder="Durée"/>
           </div>
-          <input class="input" style="padding:7px 10px;font-size:12.5px;margin-bottom:8px" value="${esc(c.video_url||'')}" oninput="updField('${c.id}','video_url',this.value)" placeholder="URL vidéo YouTube / Vimeo (optionnel)"/>
+          <input class="input" style="padding:7px 10px;font-size:12.5px;margin-bottom:6px" value="${esc(c.video_url||'')}" oninput="updField('${c.id}','video_url',this.value)" placeholder="URL vidéo du sujet (YouTube / Vimeo)"/>
+          <input class="input" style="padding:7px 10px;font-size:12.5px;margin-bottom:6px" value="${esc(c.video_corrige_url||'')}" oninput="updField('${c.id}','video_corrige_url',this.value)" placeholder="URL vidéo du corrigé (optionnel)"/>
+          <input class="input" style="padding:7px 10px;font-size:12.5px;margin-bottom:8px" value="${esc(c.description||'')}" oninput="updField('${c.id}','description',this.value)" placeholder="Description courte"/>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--sub);cursor:pointer"><input type="checkbox" ${c.gratuit?"checked":""} onchange="updField('${c.id}','gratuit',this.checked)"/>Gratuit (sans abonnement)</label>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <label class="btn btn-ghost btn-sm" style="cursor:pointer">📎 ${c.corrige_path?"Remplacer corrigé":"Upload corrigé PDF"}<input type="file" accept="image/*,application/pdf" style="display:none" onchange="uploadCorrige('${c.id}',this.files[0])"/></label>
+              ${c.corrige_path?`<span class="pill">✓ corrigé en base</span>`:""}
               ${up&&c.outUrl?`<a class="btn btn-ink btn-sm" href="${c.outUrl}" download="${c.outName}">⬇ Tatoué</a>`:""}
               ${up&&c.file?`<button class="btn btn-ghost btn-sm" onclick="regen('${c.id}')">Régénérer QR</button>`:""}
               <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="delItem('${c.id}')">Supprimer</button>
@@ -1347,7 +1573,7 @@ function updField(id,k,v){
 async function delItem(id){
   const c=state.contenus.find(x=>x.id===id);
   if(!confirm("Supprimer ce contenu ? Cette action est définitive."))return;
-  if(c&&c.source!=="seed")await dbDeleteContenu(id,c.file_path);
+  if(c&&c.source!=="seed")await dbDeleteContenu(id,c.file_path,c.corrige_path);
   state.contenus=state.contenus.filter(x=>x.id!==id);
   render();
 }
@@ -1422,6 +1648,24 @@ async function handleFiles(files){
   }
 }
 async function regen(id){const c=state.contenus.find(x=>x.id===id);if(!c)return;c.outUrl=null;c.qr=null;render();await processRecord(c);render();}
+
+async function uploadCorrige(id,file){
+  if(!file)return;
+  const c=state.contenus.find(x=>x.id===id);if(!c)return;
+  toast("📤 Upload du corrigé en cours…","ok",2000);
+  // upload dans le bucket sujets avec un suffixe _corr
+  if(!sb){toast("Pas de connexion","err");return;}
+  try{
+    const ext=(file.name.match(/\.[^.]+$/)||[""])[0]||"";
+    const path=`${c.id}_corr${ext}`;
+    const{error}=await sb.storage.from("sujets").upload(path,file,{upsert:true,contentType:file.type||undefined});
+    if(error){toast("Échec upload : "+error.message,"err",5000);return;}
+    c.corrige_path=path;
+    await dbUpdateContenu(c.id,{corrige_path:path});
+    toast("✓ Corrigé uploadé + sauvegardé en base","ok");
+    render();
+  }catch(e){toast("Erreur : "+e.message,"err");}
+}
 
 var scanStream=null, scanRAF=null;
 async function resolveToken(str){
@@ -1505,6 +1749,7 @@ async function saveNewContenu(){
     type:get("ncType")||a.tab,
     titre,tuteur:get("ncTuteur")||"—",note:get("ncNote")||"—",duree:get("ncDuree")||"",
     video_url:get("ncVideo").trim()||null,
+    video_corrige_url:get("ncVideoCorr").trim()||null,
     description:get("ncDesc").trim()||null,
     gratuit:document.getElementById("ncGratuit").checked,
     account:ACCOUNT,email:(state.user&&state.user.email)||ADMIN_EMAIL,
@@ -1533,10 +1778,12 @@ function renderNewContenu(){
         <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Note /20</label><input class="input" id="ncNote" placeholder="18"/></div>
         <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Durée</label><input class="input" id="ncDuree" placeholder="12 min"/></div>
       </div>
-      <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">URL vidéo (YouTube / Vimeo)</label>
+      <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">URL vidéo du sujet (YouTube / Vimeo)</label>
         <input class="input" id="ncVideo" placeholder="https://www.youtube.com/watch?v=..."/></div>
+      <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">URL vidéo du corrigé (optionnel)</label>
+        <input class="input" id="ncVideoCorr" placeholder="URL YouTube/Vimeo de la correction"/></div>
       <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Description (optionnel)</label>
-        <textarea class="input" id="ncDesc" rows="3" style="resize:vertical;font-family:inherit" placeholder="Courte intro du contenu, ce qu'on y apprend…"></textarea></div>
+        <textarea class="input" id="ncDesc" rows="3" style="resize:vertical;font-family:inherit" placeholder="Énoncé reformulé, méthode-clé, ce qu'on y apprend…"></textarea></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);cursor:pointer;padding:8px 0"><input type="checkbox" id="ncGratuit"/>Gratuit (accessible sans abonnement)</label>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
