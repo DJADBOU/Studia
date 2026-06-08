@@ -79,6 +79,18 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .video-preview-modal .box{width:100%;max-width:920px;aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden;position:relative}
 .video-preview-modal iframe{width:100%;height:100%;border:0}
 .video-preview-modal .close{position:absolute;top:-44px;right:0;background:rgba(255,255,255,.1);border:none;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:16px}
+.search-overlay{position:fixed;inset:0;z-index:200;background:rgba(26,26,24,.55);display:flex;align-items:flex-start;justify-content:center;padding:80px 20px 20px;animation:fadeUp .2s ease}
+.search-modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;max-width:580px;width:100%;max-height:70vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.2)}
+.search-results{flex:1;overflow-y:auto;padding:6px}
+.search-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:background .12s}
+.search-item:hover{background:var(--bg)}
+.bookmark-btn{background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);padding:4px 8px;transition:transform .15s,color .15s}
+.bookmark-btn:hover{transform:scale(1.15)}
+.bookmark-btn.on{color:#F5A623}
+.notes-panel{margin-top:24px;background:#FBFBF5;border:1px solid #EAE6D4;border-radius:14px;padding:18px 20px}
+.notes-panel textarea{width:100%;border:0;background:transparent;font-size:14.5px;font-family:inherit;line-height:1.5;outline:none;resize:vertical;min-height:80px;color:var(--text)}
+.onboarding-overlay{position:fixed;inset:0;z-index:300;background:rgba(26,26,24,.6);display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeUp .3s ease}
+.onboarding-card{background:#fff;border-radius:18px;max-width:440px;padding:32px;text-align:center;position:relative}
 .qrmini{width:46px;height:46px;border:1px solid var(--border);border-radius:7px;padding:3px;background:#fff;flex-shrink:0}
 .qrmini img{width:100%;height:100%}
 .note{display:flex;gap:10px;background:var(--amberSoft);border:1px solid #EADFC4;border-radius:12px;padding:14px;font-size:13px;color:#6B5418;line-height:1.55}
@@ -282,6 +294,28 @@ async function loadContenus(){
     }
   }catch(e){console.warn("loadContenus:",e.message);}
 }
+/* ===== Anti-flicker : ne jamais re-render pendant qu'on tape ===== */
+// Mémorise les écritures locales récentes pour ignorer l'écho Realtime.
+const _selfEdits={};
+function markSelfEdit(id){_selfEdits[id]=Date.now();}
+function isSelfEdit(id){const t=_selfEdits[id];return t&&(Date.now()-t<6000);}
+// Vrai si l'utilisateur est en train d'éditer un champ (input/textarea/select).
+function isEditingField(){
+  const el=document.activeElement;if(!el)return false;
+  const tag=el.tagName;
+  return tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||el.isContentEditable;
+}
+// Render qui n'interrompt jamais une saisie en cours : si un champ a le focus,
+// on diffère jusqu'au blur au lieu de détruire le DOM.
+let _pendingRender=false;
+function safeRender(){
+  if(isEditingField()){_pendingRender=true;return;}
+  render();
+}
+document.addEventListener("focusout",()=>{
+  if(_pendingRender){_pendingRender=false;setTimeout(()=>{if(!isEditingField())render();},80);}
+},true);
+
 let _realtimeCh=null;
 function setupRealtime(){
   if(!sb||_realtimeCh)return;
@@ -290,11 +324,17 @@ function setupRealtime(){
       .on("postgres_changes",{event:"*",schema:"public",table:"contenus"},payload=>{
         const ev=payload.eventType;
         if(ev==="INSERT"){
-          const c=payload.new;if(!state.contenus.find(x=>x.id===c.id)){state.contenus.push({...c,source:c.source||"upload"});toast("✓ Nouveau contenu ajouté","ok",2000);render();}
+          const c=payload.new;if(!state.contenus.find(x=>x.id===c.id)){state.contenus.push({...c,source:c.source||"upload"});if(!isSelfEdit(c.id))toast("✓ Nouveau contenu ajouté","ok",2000);safeRender();}
         }else if(ev==="UPDATE"){
-          const c=payload.new;const i=state.contenus.findIndex(x=>x.id===c.id);if(i>=0){state.contenus[i]={...state.contenus[i],...c};render();}
+          const c=payload.new;const i=state.contenus.findIndex(x=>x.id===c.id);
+          if(i>=0){
+            state.contenus[i]={...state.contenus[i],...c};
+            // Écho de notre propre sauvegarde OU saisie en cours → on ne re-render PAS
+            // (les données sont déjà à jour en mémoire, le prochain render naturel les prendra).
+            if(!isSelfEdit(c.id))safeRender();
+          }
         }else if(ev==="DELETE"){
-          state.contenus=state.contenus.filter(x=>x.id!==payload.old.id);render();
+          state.contenus=state.contenus.filter(x=>x.id!==payload.old.id);safeRender();
         }
       })
       .on("postgres_changes",{event:"*",schema:"public",table:"categories"},()=>{loadCategories();})
@@ -303,6 +343,93 @@ function setupRealtime(){
 }
 async function checkSubscription(){if(!sb||!state.user)return;try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;const{data}=await sb.from("subscribers").select("status").eq("user_id",u.user.id).maybeSingle();if(data&&data.status==="active"){state.subscribed=true;render();}}catch(e){}}
 async function loadAdmins(){if(!sb)return;try{const{data,error}=await sb.from("admins").select("email");if(!error&&data){ADMIN_EMAILS=new Set([ADMIN_EMAIL,...data.map(r=>r.email)]);}}catch(e){}}
+/* ===== Reset password ===== */
+async function resetPassword(){
+  const email=prompt("Ton email pour recevoir le lien de réinitialisation :");
+  if(!email||!email.trim())return;
+  if(!sb){toast("Pas de connexion","err");return;}
+  try{
+    const{error}=await sb.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.origin});
+    if(error){toast(error.message,"err",4000);return;}
+    toast("✓ Email de reset envoyé. Check ta boîte.","ok",4000);
+  }catch(e){toast("Erreur : "+e.message,"err");}
+}
+
+/* ===== Bookmarks ===== */
+async function loadBookmarks(){
+  if(!sb||!state.user)return;
+  try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
+    const{data}=await sb.from("bookmarks").select("contenu_id").eq("user_id",u.user.id);
+    if(data)state.bookmarks=new Set(data.map(b=>b.contenu_id));
+  }catch(e){}
+}
+async function toggleBookmark(contenu_id){
+  if(!sb||!state.user){toast("Connecte-toi pour ajouter aux favoris","warn");nav("login");return;}
+  try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
+    if(state.bookmarks.has(contenu_id)){
+      await sb.from("bookmarks").delete().eq("user_id",u.user.id).eq("contenu_id",contenu_id);
+      state.bookmarks.delete(contenu_id);toast("Retiré des favoris","ok",1500);
+    }else{
+      await sb.from("bookmarks").insert({user_id:u.user.id,contenu_id});
+      state.bookmarks.add(contenu_id);toast("✓ Ajouté aux favoris","ok",1500);
+    }
+    render();
+  }catch(e){toast("Erreur","err");}
+}
+
+/* ===== Notes personnelles ===== */
+async function loadNoteFor(contenu_id){
+  if(!sb||!state.user)return;
+  try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
+    const{data}=await sb.from("notes").select("*").eq("user_id",u.user.id).eq("contenu_id",contenu_id).maybeSingle();
+    state.currentNote=data||{contenu_id,texte:""};
+    safeRender();
+  }catch(e){}
+}
+const _noteTimers={};const _noteSaving={};
+async function updNote(contenu_id,texte){
+  if(!sb||!state.user)return;
+  state.currentNote={...(state.currentNote||{}),contenu_id,texte};
+  if(_noteTimers[contenu_id])clearTimeout(_noteTimers[contenu_id]);
+  _noteTimers[contenu_id]=setTimeout(async()=>{
+    if(_noteSaving[contenu_id])return;_noteSaving[contenu_id]=true;
+    try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
+      const cur=state.currentNote||{};
+      if(cur.id){
+        // Note déjà créée → simple update (pas de doublon)
+        await sb.from("notes").update({texte,updated_at:new Date().toISOString()}).eq("id",cur.id);
+      }else{
+        // 1ère sauvegarde → insert + on capture l'id pour les suivantes
+        const{data,error}=await sb.from("notes").insert({user_id:u.user.id,contenu_id,texte}).select("id").maybeSingle();
+        if(!error&&data&&state.currentNote)state.currentNote.id=data.id;
+      }
+      toast("✓ Note enregistrée","ok",1200);
+    }catch(e){}finally{_noteSaving[contenu_id]=false;}
+  },800);
+}
+
+/* ===== Recherche ===== */
+function performSearch(q){
+  const ql=(q||"").toLowerCase().trim();
+  if(!ql)return [];
+  return state.contenus.filter(c=>{
+    const blob=(c.titre+" "+c.matiere+" "+c.tuteur+" "+(c.description||"")+" "+labelFor(c.type)+" "+c.annee).toLowerCase();
+    return blob.includes(ql);
+  }).slice(0,20);
+}
+
+/* ===== Public stats (landing) ===== */
+async function loadPublicStats(){
+  if(!sb)return;
+  try{
+    const{count:nbContenus}=await sb.from("contenus").select("*",{count:"exact",head:true});
+    const{count:nbUsers}=await sb.from("profiles").select("*",{count:"exact",head:true});
+    const{count:nbSubs}=await sb.from("subscribers").select("*",{count:"exact",head:true}).eq("status","active");
+    state.publicStats={contenus:nbContenus||0,users:nbUsers||0,subscribers:nbSubs||0};
+    render();
+  }catch(e){}
+}
+
 async function uploadAvatar(file){
   if(!file||!sb||!state.user){toast("Pas connecté","err");return;}
   if(!file.type.startsWith("image/")){toast("Image uniquement","err");return;}
@@ -325,7 +452,7 @@ async function loadCategories(){
   if(!sb)return;
   try{
     const{data,error}=await sb.from("categories").select("*").order("position");
-    if(!error&&data&&data.length){state.categories=data;render();}
+    if(!error&&data&&data.length){state.categories=data;safeRender();}
   }catch(e){console.warn("loadCategories:",e.message);}
 }
 async function dbUpsertCategory(c){
@@ -337,7 +464,7 @@ async function dbDeleteCategory(id){
   try{const{error}=await sb.from("categories").delete().eq("id",id);if(error){toast(error.message,"err");return;}toast("Catégorie supprimée","ok");}catch(e){}
 }
 function defaultIconFor(id){const ic={cours:"📘",td:"▶",midterm:"🗒",examen:"📝",partiel:"📋",methode:"💡",annale:"📂"};return ic[(id||"").toLowerCase()]||"📄";}
-async function restoreSession(){if(!sb)return;try{await loadAdmins();const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=isAdminEmail(data.user.email);state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;showDbStatus(true);render();await checkSubscription();await loadProfile();render();}}catch(e){}}
+async function restoreSession(){if(!sb)return;try{await loadAdmins();const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=isAdminEmail(data.user.email);state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;showDbStatus(true);render();await checkSubscription();await loadProfile();await loadBookmarks();render();maybeShowOnboarding();}}catch(e){}}
 async function loadHiddenMatieres(){if(!sb)return;try{const{data,error}=await sb.from("matieres_hidden").select("*");if(!error&&data){state.hiddenMatieres=new Set(data.map(r=>`${r.univ}|${r.faculte}|${r.annee}|${r.matiere}`));}}catch(e){}}
 async function dbHideMatiere(univ,faculte,annee,matiere){if(!sb)return false;try{const{error}=await sb.from("matieres_hidden").insert({univ,faculte,annee,matiere});if(error){toast("Échec : "+error.message,"err");return false;}toast("Matière masquée","ok");return true;}catch(e){toast("Erreur","err");return false;}}
 function goCheckout(plan){const link=plan==="semestre"?CONFIG.STRIPE_LINK_SEMESTRE:CONFIG.STRIPE_LINK_MENSUEL;if(link){window.location.href=link;}else{state.modal=true;renderModal();}}
@@ -733,6 +860,13 @@ const state={
   categories:[],
   pdfFullscreen:false,
   semestre:"S1",
+  bookmarks:new Set(),
+  currentNote:null,
+  searchOpen:false,
+  searchQuery:"",
+  publicStats:null,
+  univsTab:"univs",
+  onboardingStep:0,
 };
 
 /* ===== templates ===== */
@@ -837,8 +971,10 @@ async function openItem(id){
   // Charge le PDF si l'utilisateur a le droit
   const unlocked=c.gratuit||state.subscribed||(state.user&&state.user.role==="admin");
   if(unlocked&&c.file_path&&!c.video_url)preparePDFForView(c,c.file_path);
-  // Charge les commentaires
-  if(sb){loadComments(c.id).then(cmts=>{state.comments=cmts;render();});}
+  // Charge les commentaires (safeRender : n'interrompt pas une saisie de commentaire en cours)
+  if(sb){loadComments(c.id).then(cmts=>{state.comments=cmts;safeRender();});}
+  // Charge la note perso
+  if(sb&&state.user)loadNoteFor(c.id);
 }
 function startViewTimer(contenu_id){
   stopViewTimer();
@@ -918,9 +1054,14 @@ function render(){
   if(typeof scanStream!=="undefined"&&scanStream)stopScan();
   if(state.view!=="detail"&&state._timer)stopViewTimer();
   if(state.view!=="detail"&&(state._pdfUrl||state._corrUrl))disposePDF();
+  // Ne scroller en haut QUE si on change réellement de page (navigation),
+  // pas sur un simple update en place (favori, commentaire, sauvegarde, écho realtime).
+  const _ax=state.a||{};
+  const _scrollKey=`${state.view}|${state.univ&&state.univ.id}|${state.faculte&&state.faculte.id}|${state.annee}|${state.matiere}|${state.item&&state.item.id}|${_ax.view}|${_ax.mat}|${_ax.niv}`;
+  const _navChanged=_scrollKey!==state._scrollKey;state._scrollKey=_scrollKey;
   const app=document.getElementById("app");
-  if(state.view==="landing"){app.innerHTML=Landing();setTimeout(setupReveals,40);window.scrollTo(0,0);return;}
-  if(state.view==="login"){app.innerHTML=Nav()+LoginView()+Footer();window.scrollTo(0,0);return;}
+  if(state.view==="landing"){app.innerHTML=Landing();setTimeout(setupReveals,40);if(_navChanged)window.scrollTo(0,0);return;}
+  if(state.view==="login"){app.innerHTML=Nav()+LoginView()+Footer();if(_navChanged)window.scrollTo(0,0);return;}
   let h=Nav();
   const v=state.view;
   if(v==="univs")h+=UnivsView();
@@ -941,7 +1082,7 @@ function render(){
   else if(v==="mycourses")h+=MyCoursesView();
   h+=Footer();
   app.innerHTML=h;
-  // Render des overlays (plein écran PDF par-dessus tout)
+  // Render des overlays (plein écran PDF + search + onboarding)
   if(state.pdfFullscreen){
     let ov=document.getElementById("pdfFullOverlay");
     if(!ov){ov=document.createElement("div");ov.id="pdfFullOverlay";document.body.appendChild(ov);}
@@ -949,8 +1090,14 @@ function render(){
   }else{
     const ov=document.getElementById("pdfFullOverlay");if(ov)ov.remove();
   }
+  // Onboarding (1ère connexion)
+  let ob=document.getElementById("onboardingRoot");
+  if(state.onboardingStep>0){if(!ob){ob=document.createElement("div");ob.id="onboardingRoot";document.body.appendChild(ob);}ob.innerHTML=renderOnboarding();}
+  else if(ob){ob.remove();}
+  // Search modal
+  if(state.searchOpen)renderSearchModal();
   if(v==="admin"&&state.a.view==="manage")bindAdmin();
-  window.scrollTo(0,0);
+  if(_navChanged)window.scrollTo(0,0);
 }
 // Escape ferme le plein écran
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&state.pdfFullscreen)closeFullscreenPDF();});
@@ -976,9 +1123,9 @@ function Landing(){
     <section class="sec reveal" style="border:none;padding:30px 0 50px">
       <div class="stats-band">
         <div class="stats-grid">
-          <div class="stat reveal" data-counter="${s.cours}"><span class="stat-num">0</span><div class="stat-label">Cours vidéo</div></div>
-          <div class="stat reveal" data-counter="${s.td}"><span class="stat-num">0</span><div class="stat-label">TD corrigés</div></div>
-          <div class="stat reveal" data-counter="${s.examens}"><span class="stat-num">0</span><div class="stat-label">Examens corrigés</div></div>
+          <div class="stat reveal" data-counter="${(state.publicStats&&state.publicStats.contenus)||s.cours+s.td+s.examens}"><span class="stat-num">0</span><div class="stat-label">Contenus publiés</div></div>
+          <div class="stat reveal" data-counter="${(state.publicStats&&state.publicStats.users)||0}"><span class="stat-num">0</span><div class="stat-label">Étudiants inscrits</div></div>
+          <div class="stat reveal" data-counter="${(state.publicStats&&state.publicStats.subscribers)||0}"><span class="stat-num">0</span><div class="stat-label">Abonnés actifs</div></div>
           <div class="stat reveal" data-counter="${s.heures}"><span class="stat-num">0<span class="stat-suffix">h</span></span><div class="stat-label">de vidéo</div></div>
         </div>
       </div>
@@ -988,16 +1135,12 @@ function Landing(){
       <span class="eyebrow">Les écoles déjà sur Studia</span>
       <h2 class="sec-title">On s'étend campus par campus.</h2>
       <p class="sec-lead">Chaque école dispose de ses propres tuteurs majors. On vérifie la qualité avant publication.</p>
-      <h3 style="font-size:14px;letter-spacing:.5px;text-transform:uppercase;color:var(--sub);margin:8px 0 14px;font-weight:600">🎓 Universités</h3>
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin-bottom:36px">
-        ${UNIVS.filter(u=>u.type!=="esc").map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.6"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
-          <div class="photo" style="aspect-ratio:16/10"><img loading="lazy" src="${SITE_IMG[u.id]}" onerror="this.remove()"/></div>
-          <div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="display:flex;align-items:center;gap:10px;min-width:0">${univLogoHTML(u)}<div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.2">${u.nom}</div></div>${u.actif?'<span class="pill">Live</span>':'<span class="tag">Bientôt</span>'}</div><div class="muted" style="margin-top:8px">${u.ville}${u.actif?` · ${u.facultes.length} filières`:""}</div></div>
-        </div>`).join("")}
+      <div class="seg" style="margin-bottom:24px">
+        <button class="${(state.univsTab||'univs')==='univs'?'on':''}" onclick="state.univsTab='univs';render()">🎓 Universités (${UNIVS.filter(u=>u.type!=="esc").length})</button>
+        <button class="${state.univsTab==='esc'?'on':''}" onclick="state.univsTab='esc';render()">💼 Écoles de commerce (${UNIVS.filter(u=>u.type==="esc").length})</button>
       </div>
-      <h3 style="font-size:14px;letter-spacing:.5px;text-transform:uppercase;color:var(--sub);margin:8px 0 14px;font-weight:600">💼 Écoles de commerce</h3>
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
-        ${UNIVS.filter(u=>u.type==="esc").map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.6"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
+        ${UNIVS.filter(u=>(state.univsTab||"univs")==="esc"?u.type==="esc":u.type!=="esc").map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.6"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
           <div class="photo" style="aspect-ratio:16/10"><img loading="lazy" src="${SITE_IMG[u.id]}" onerror="this.remove()"/></div>
           <div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="display:flex;align-items:center;gap:10px;min-width:0">${univLogoHTML(u)}<div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.2">${u.nom}</div></div>${u.actif?'<span class="pill">Live</span>':'<span class="tag">Bientôt</span>'}</div><div class="muted" style="margin-top:8px">${u.ville}${u.actif?` · ${u.facultes.length} filières`:""}</div></div>
         </div>`).join("")}
@@ -1096,14 +1239,15 @@ function MobileMenu(){
 function hasProfile(){const p=state.profile;return !!(p&&p.univ&&p.faculte);}
 function Nav(){
   const showMyEspace=!!state.user;
-  // Cache Explorer/Programme pour les étudiants connectés avec profil (lockés à leur fac)
   const isLockedStudent=state.user&&!isAdminUser()&&hasProfile();
   const showExplorer=!isLockedStudent;
+  const searchBtn=`<button onclick="openSearch()" title="Recherche (Cmd+K)" style="background:none;border:none;cursor:pointer;color:var(--sub);padding:7px 10px;border-radius:7px;font-size:15px" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">🔍</button>`;
   return `<div class="nav"><div class="wrap nav-in">
     <div onclick="nav('landing')" style="display:flex;align-items:center;gap:8px;cursor:pointer"><div class="logo">S</div><span style="font-weight:600;font-size:17px;color:var(--ink)">Studia</span></div>
     <div class="nav-links">
       ${showMyEspace?`<button class="link ${state.view==="mycourses"?"on":""}" onclick="goMyCourses()">Mon espace</button>`:""}
       ${showExplorer?`<button class="link ${["univs","facultes","programme","matiere","detail"].includes(state.view)?"on":""}" onclick="goProgramme()">${showMyEspace?"Explorer":"Programme"}</button>`:""}
+      ${searchBtn}
       <button class="link ${state.view==="tarifs"?"on":""}" onclick="nav('tarifs')">Tarifs</button>
       <button class="link ${state.view==="tuteur"?"on":""}" onclick="nav('tuteur')">Devenir tuteur</button>
       ${navRight()}
@@ -1129,16 +1273,17 @@ function univCardHTML(u){return `<div class="card ${u.actif?"card-h":""}" style=
 function UnivsView(){
   const univs=UNIVS.filter(u=>u.type!=="esc");
   const escs=UNIVS.filter(u=>u.type==="esc");
+  const tab=state.univsTab||"univs";
+  const list=tab==="univs"?univs:escs;
   return `<div class="wrap fade" style="padding:54px 0 0">
     <h1 class="serif" style="font-size:42px;color:var(--ink);margin:0 0 8px">Choisis ton école</h1>
-    <p style="font-size:15px;color:var(--sub);margin:0 0 30px">Studia s'étend établissement par établissement. Sélectionne le tien.</p>
-    <h3 style="font-size:14px;letter-spacing:.5px;text-transform:uppercase;color:var(--sub);margin:0 0 14px;font-weight:600">🎓 Universités</h3>
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:40px">
-      ${univs.map(univCardHTML).join("")}
+    <p style="font-size:15px;color:var(--sub);margin:0 0 22px">Studia s'étend établissement par établissement.</p>
+    <div class="seg" style="margin-bottom:28px">
+      <button class="${tab==='univs'?'on':''}" onclick="state.univsTab='univs';render()">🎓 Universités <span style="color:var(--muted);font-weight:400">(${univs.length})</span></button>
+      <button class="${tab==='esc'?'on':''}" onclick="state.univsTab='esc';render()">💼 Écoles de commerce <span style="color:var(--muted);font-weight:400">(${escs.length})</span></button>
     </div>
-    <h3 style="font-size:14px;letter-spacing:.5px;text-transform:uppercase;color:var(--sub);margin:0 0 14px;font-weight:600">💼 Écoles de commerce</h3>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
-      ${escs.map(univCardHTML).join("")}
+      ${list.map(univCardHTML).join("")}
     </div>
   </div>`;
 }
@@ -1198,6 +1343,14 @@ function MyCoursesView(){
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span class="eyebrow" style="margin:0">Continue ta progression</span><span class="muted" style="font-size:11.5px">${s.count} ${s.count>1?"contenus suivis":"contenu suivi"} · ${fmtDuration(s.seconds)} étudié</span></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">
         ${s.recent.slice(0,3).map(r=>{const c=state.contenus.find(x=>x.id===r.contenu_id);if(!c)return "";return `<div class="card card-h" style="padding:14px;display:flex;align-items:center;gap:12px" onclick="resumeContenu('${c.id}')"><div class="ic">${smartIcon(c)}</div><div style="flex:1;min-width:0"><div style="font-weight:500;color:var(--ink);font-size:14px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.titre||"")}</div><div class="muted" style="font-size:11.5px">${fmtDuration(r.duration_seconds)} · ${fmtRelativeDate(r.updated_at)}</div></div><span style="color:var(--muted)">▶</span></div>`;}).join("")}
+      </div>
+    </div>`:""}
+
+    ${state.bookmarks.size>0?`
+    <div style="margin-bottom:28px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 class="serif" style="font-size:22px;color:var(--ink);margin:0">★ Mes favoris <span class="muted" style="font-size:13px">(${state.bookmarks.size})</span></h2></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">
+        ${[...state.bookmarks].slice(0,6).map(id=>{const c=state.contenus.find(x=>x.id===id);if(!c)return "";return `<div class="card card-h" style="padding:14px;display:flex;align-items:center;gap:12px" onclick="resumeContenu('${c.id}')"><div class="ic">${smartIcon(c)}</div><div style="flex:1;min-width:0"><div style="font-weight:500;color:var(--ink);font-size:14px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.titre||"")}</div><div class="muted" style="font-size:11.5px">${esc(c.matiere||"")} · ${labelFor(c.type)}</div></div><span style="color:#F5A623;font-size:16px">★</span></div>`;}).join("")}
       </div>
     </div>`:""}
 
@@ -1280,9 +1433,12 @@ function MatiereView(){
     <div class="tabs">${cats.map(c=>`<button class="${tab===c.id?"on":""}" onclick="setTab('${c.id}')">${esc(c.label)} <span style="color:var(--muted);font-weight:400">${countMat(uid,fid,annee,matiere,c.id,sem)}</span></button>`).join("")}</div>
     <div style="max-width:760px">${items.length?items.map(it=>{
       const locked=!it.gratuit&&!state.subscribed&&!isAdminUser();
+      const bookmarked=state.bookmarks.has(it.id);
       return `<div class="card card-h row" onclick="openItem('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":smartIcon(it)}</div>
         <div style="flex:1;min-width:0"><div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span class="tag">${labelFor(it.type)}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}${it.source==="upload"?'<span class="tag amber">Nouveau</span>':""}${it.video_url?'<span class="pill">▶ Vidéo</span>':""}</div>
-        <div style="font-size:15px;color:var(--ink);font-weight:500;margin-bottom:3px">${it.titre}</div><div class="muted">★ ${it.tuteur} · ${it.note}/20${it.duree?" · "+it.duree:""}</div></div><span style="color:var(--muted)">›</span></div>`;
+        <div style="font-size:15px;color:var(--ink);font-weight:500;margin-bottom:3px">${it.titre}</div><div class="muted">★ ${it.tuteur} · ${it.note}/20${it.duree?" · "+it.duree:""}</div></div>
+        <button class="bookmark-btn ${bookmarked?"on":""}" onclick="event.stopPropagation();toggleBookmark('${it.id}')" title="${bookmarked?"Retirer des favoris":"Ajouter aux favoris"}">${bookmarked?"★":"☆"}</button>
+        <span style="color:var(--muted)">›</span></div>`;
     }).join(""):`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucun contenu ici pour l'instant.</div>`}</div>
   </div>`;
 }
@@ -1378,6 +1534,11 @@ function Detail(){
       ${it.corrige_path?`<button class="btn btn-ghost btn-sm" onclick="downloadProtected('${it.id}_corr')">⬇ Télécharger le corrigé (tatoué)</button>`:""}
     </div>`:""}
 
+    ${unlocked&&state.user?`<div class="notes-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="font-size:14px;color:var(--ink);font-weight:600;margin:0">📝 Mes notes (privées)</h3>${state.bookmarks.has(it.id)?'<span class="pill" style="background:#FFF3D9;color:#9A6A18">★ Favori</span>':""}</div>
+      <textarea placeholder="Note clé, formule à retenir, page intéressante… (auto-sauvegardé)" oninput="updNote('${it.id}',this.value)">${esc((state.currentNote&&state.currentNote.contenu_id===it.id)?state.currentNote.texte:"")}</textarea>
+    </div>`:""}
+
     ${unlocked?`<div class="comments">
       <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 16px">Questions &amp; commentaires <span class="muted" style="font-size:13px">(${(state.comments||[]).length})</span></h2>
       ${state.user?`<div class="comment-form">
@@ -1426,9 +1587,51 @@ function Tarifs(){
   </div>`;
 }
 
+function captureTutor(){
+  const g=id=>{const e=document.getElementById(id);return e?e.value:undefined;};
+  state._taForm={...(state._taForm||{}),prenom:g("taPrenom"),nom:g("taNom"),email:g("taEmail"),phone:g("taPhone"),faculte:g("taFaculte"),annee:g("taAnnee"),matiere:g("taMatiere"),note:g("taNote"),message:g("taMessage")};
+}
 function Tuteur(){
   const cr=[["Note ≥ 16/20","Tu dois avoir cartonné dans la matière."],["Correction-test validée","Relue par l'équipe avant publication."],["Contenu 100 % original","Tes propres cours et corrigés — jamais ceux d'un prof."]];
-  return `<div class="wrap fade" style="padding:54px 0 0"><div style="max-width:640px"><span class="pill">Rejoins l'équipe</span><h1 class="serif" style="font-size:46px;color:var(--ink);margin:18px 0 16px;line-height:1.05">Aide ta promo, gagne de l'argent, muscle ton CV.</h1><p style="font-size:17px;color:var(--sub);line-height:1.6;margin:0 0 32px">Tu as excellé ? Transmets ta méthode. Rémunéré sur chaque contenu publié, et une vraie ligne d'expérience.</p></div><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:32px">${cr.map(([t,d],i)=>`<div class="card" style="padding:22px"><div class="serif" style="font-size:24px;color:var(--accentDark);margin-bottom:8px">0${i+1}</div><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0 0 6px">${t}</h3><p style="font-size:14px;color:var(--sub);line-height:1.55;margin:0">${d}</p></div>`).join("")}</div><div class="note" style="max-width:720px">⚠️ <div><b>Charte tuteur.</b> Chaque tuteur certifie que son contenu est original et ne reproduit aucun support de cours d'un enseignant. Règle non négociable — et notre protection.</div></div></div>`;
+  const p=state.profile||{};
+  const tf=state._taForm||{};
+  const u=univById(p.univ||state._taUniv||"uca");
+  if(state.tutorApplied){
+    return `<div class="wrap fade" style="padding:54px 0;max-width:600px;text-align:center"><div class="card" style="padding:48px 32px"><div style="font-size:50px;margin-bottom:14px">✅</div><h1 class="serif" style="font-size:30px;color:var(--ink);margin:0 0 12px">Candidature reçue !</h1><p style="color:var(--sub);font-size:15px;line-height:1.6;margin:0">L'équipe Studia te répond sous 48h par email. En attendant, prépare un exemple de correction sur une feuille A4 — c'est ce qu'on te demandera ensuite.</p><button class="btn btn-ghost" style="margin-top:24px" onclick="nav('landing')">Retour à l'accueil</button></div></div>`;
+  }
+  return `<div class="wrap fade" style="padding:54px 0 0">
+    <div style="max-width:640px">
+      <span class="pill">Rejoins l'équipe</span>
+      <h1 class="serif" style="font-size:46px;color:var(--ink);margin:18px 0 16px;line-height:1.05">Aide ta promo, gagne de l'argent, muscle ton CV.</h1>
+      <p style="font-size:17px;color:var(--sub);line-height:1.6;margin:0 0 32px">Tu as excellé ? Transmets ta méthode. Rémunéré sur chaque contenu publié, et une vraie ligne d'expérience.</p>
+    </div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:32px">${cr.map(([t,d],i)=>`<div class="card" style="padding:22px"><div class="serif" style="font-size:24px;color:var(--accentDark);margin-bottom:8px">0${i+1}</div><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0 0 6px">${t}</h3><p style="font-size:14px;color:var(--sub);line-height:1.55;margin:0">${d}</p></div>`).join("")}</div>
+    <div class="note" style="max-width:720px;margin-bottom:32px">⚠️ <div><b>Charte tuteur.</b> Chaque tuteur certifie que son contenu est original et ne reproduit aucun support de cours d'un enseignant. Règle non négociable — et notre protection.</div></div>
+    <div class="card" style="padding:32px;max-width:720px">
+      <h2 class="serif" style="font-size:26px;color:var(--ink);margin:0 0 8px">Candidate maintenant</h2>
+      <p class="muted" style="margin:0 0 20px">Réponse sous 48h. Tu seras invité à une correction-test si retenu.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <input class="input" id="taPrenom" placeholder="Prénom *" value="${esc(tf.prenom!==undefined?tf.prenom:(p.prenom||""))}"/>
+        <input class="input" id="taNom" placeholder="Nom *" value="${esc(tf.nom!==undefined?tf.nom:(p.nom||""))}"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <input class="input" id="taEmail" type="email" placeholder="Email *" value="${esc(tf.email!==undefined?tf.email:((state.user&&state.user.email)||""))}"/>
+        <input class="input" id="taPhone" type="tel" placeholder="Téléphone" value="${esc(tf.phone!==undefined?tf.phone:(p.phone||""))}"/>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <select class="input" id="taUniv" onchange="state._taUniv=this.value;captureTutor();render()">${UNIVS.map(uu=>`<option value="${uu.id}" ${(state._taUniv||p.univ||"uca")===uu.id?"selected":""}>${uu.nom}</option>`).join("")}</select>
+        <select class="input" id="taFaculte">${(u&&u.facultes||[]).map(f=>`<option value="${f.id}" ${(tf.faculte||p.faculte)===f.id?"selected":""}>${f.nom}</option>`).join("")||'<option>—</option>'}</select>
+        <select class="input" id="taAnnee">${["L1","L2","L3","M1","M2"].map(a=>`<option value="${a}" ${(tf.annee||p.annee)===a?"selected":""}>${a}</option>`).join("")}</select>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:10px">
+        <input class="input" id="taMatiere" placeholder="Matière que tu veux enseigner * (ex. Microéconomie)" value="${esc(tf.matiere||"")}"/>
+        <input class="input" id="taNote" placeholder="Ta note /20 * (ex. 18)" value="${esc(tf.note||"")}"/>
+      </div>
+      <textarea class="input" id="taMessage" rows="3" placeholder="Pourquoi toi ? (optionnel)" style="resize:vertical;font-family:inherit;margin-bottom:14px">${esc(tf.message||"")}</textarea>
+      <button class="btn btn-accent" style="width:100%" onclick="submitTutorApplication()">Envoyer ma candidature</button>
+      ${!state.user?'<p class="muted" style="margin-top:10px;font-size:11.5px;text-align:center"><a onclick="nav(\'login\')" style="color:var(--accentDark);cursor:pointer">Connecte-toi</a> avant pour candidater (sécurité).</p>':""}
+    </div>
+  </div>`;
 }
 /* ===== Profile (Mon compte) ===== */
 function fmtDuration(seconds){
@@ -1454,7 +1657,8 @@ function ProfileView(){
   const initials=getInitials(p,state.user);
   const avatarUrl=p.avatar_url||null;
   const editing=state.editProfile;
-  const nom=p.nom||"", prenom=p.prenom||"", univ=p.univ||"uca", faculte=p.faculte||"", annee=p.annee||"L1", bio=p.bio||"";
+  const pf=state._profForm||{};
+  const nom=pf.nom!==undefined?pf.nom:(p.nom||""), prenom=pf.prenom!==undefined?pf.prenom:(p.prenom||""), univ=pf.univ||p.univ||"uca", faculte=pf.faculte!==undefined?pf.faculte:(p.faculte||""), annee=pf.annee||p.annee||"L1", bio=pf.bio!==undefined?pf.bio:(p.bio||"");
   return `<div class="wrap fade" style="padding:40px 0;max-width:900px">
     <div class="card" style="padding:32px;margin-bottom:22px">
       <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
@@ -1469,14 +1673,14 @@ function ProfileView(){
               <input class="input" id="pNom" placeholder="Nom" value="${esc(nom)}"/>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
-              <select class="input" id="pUniv">${UNIVS.map(u=>`<option value="${u.id}" ${univ===u.id?"selected":""}>${u.nom}</option>`).join("")}</select>
+              <select class="input" id="pUniv" onchange="captureProfile();render()">${UNIVS.map(u=>`<option value="${u.id}" ${univ===u.id?"selected":""}>${u.nom}</option>`).join("")}</select>
               <select class="input" id="pFaculte">${(univById(univ)||{facultes:[]}).facultes.map(f=>`<option value="${f.id}" ${faculte===f.id?"selected":""}>${f.nom}</option>`).join("")}</select>
               <select class="input" id="pAnnee">${["L1","L2","L3"].map(a=>`<option value="${a}" ${annee===a?"selected":""}>${a}</option>`).join("")}</select>
             </div>
             <textarea class="input" id="pBio" rows="2" placeholder="Quelques mots sur toi (optionnel)" style="resize:vertical">${esc(bio)}</textarea>
             <div style="display:flex;gap:8px;margin-top:10px">
               <button class="btn btn-accent btn-sm" onclick="submitProfile()">Enregistrer</button>
-              <button class="btn btn-ghost btn-sm" onclick="state.editProfile=false;render()">Annuler</button>
+              <button class="btn btn-ghost btn-sm" onclick="state.editProfile=false;state._profForm=null;render()">Annuler</button>
             </div>
           `:`
             <h1 class="serif" style="font-size:32px;color:var(--ink);margin:0 0 4px;line-height:1.1">${esc((prenom+" "+nom).trim())||state.user.email.split("@")[0]}</h1>
@@ -1518,11 +1722,15 @@ function ProfileView(){
     </div>
   </div>`;
 }
+function captureProfile(){
+  const g=id=>{const e=document.getElementById(id);return e?e.value:undefined;};
+  state._profForm={prenom:g("pPrenom"),nom:g("pNom"),univ:g("pUniv"),faculte:g("pFaculte"),annee:g("pAnnee"),bio:g("pBio")};
+}
 async function submitProfile(){
   const get=id=>(document.getElementById(id)||{}).value||"";
   const fields={prenom:get("pPrenom").trim(),nom:get("pNom").trim(),univ:get("pUniv"),faculte:get("pFaculte"),annee:get("pAnnee"),bio:get("pBio").trim()};
   const r=await saveProfile(fields);
-  if(r.ok){state.editProfile=false;render();}
+  if(r.ok){state.editProfile=false;state._profForm=null;render();}
 }
 async function changePassword(){
   const newPass=prompt("Nouveau mot de passe (6+ caractères) :");
@@ -1623,10 +1831,15 @@ function DroitsView(){
   </div></div>`;
 }
 /* ===== Login ===== */
+function captureSignup(){
+  const g=id=>{const e=document.getElementById(id);return e?e.value:undefined;};
+  state._signupForm={...(state._signupForm||{}),prenom:g("authPrenom"),nom:g("authNom"),phone:g("authPhone"),email:g("authEmail"),pass:g("authPass"),faculte:g("authFaculte"),annee:g("authAnnee")};
+}
 function LoginView(){
   const signup=state.authMode==="signup";
   const univSelected=state._signupUniv||"uca";
   const u=univById(univSelected);
+  const sf=state._signupForm||{};
   return `<div class="wrap fade" style="max-width:440px;padding:60px 0"><div class="card" style="padding:32px">
     <div class="logo" style="margin-bottom:16px">S</div>
     <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:20px">
@@ -1635,23 +1848,24 @@ function LoginView(){
     </div>
     ${signup?`
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <input class="input" id="authPrenom" placeholder="Prénom"/>
-        <input class="input" id="authNom" placeholder="Nom"/>
+        <input class="input" id="authPrenom" placeholder="Prénom" value="${esc(sf.prenom||'')}"/>
+        <input class="input" id="authNom" placeholder="Nom" value="${esc(sf.nom||'')}"/>
       </div>
-      <div style="margin-bottom:10px"><input class="input" id="authPhone" type="tel" placeholder="Numéro de téléphone (+33…)"/></div>
-      <div style="margin-bottom:10px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username"/></div>
-      <div style="margin-bottom:10px"><input class="input" id="authPass" type="password" placeholder="Mot de passe (6+ caractères)" autocomplete="new-password" onkeydown="if(event.key==='Enter')doAuth()"/></div>
+      <div style="margin-bottom:10px"><input class="input" id="authPhone" type="tel" placeholder="Numéro de téléphone (+33…)" value="${esc(sf.phone||'')}"/></div>
+      <div style="margin-bottom:10px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username" value="${esc(sf.email||'')}"/></div>
+      <div style="margin-bottom:10px"><input class="input" id="authPass" type="password" placeholder="Mot de passe (6+ caractères)" autocomplete="new-password" value="${esc(sf.pass||'')}" onkeydown="if(event.key==='Enter')doAuth()"/></div>
       <div style="margin-bottom:10px"><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Mon université</label>
-        <select class="input" id="authUniv" onchange="state._signupUniv=this.value;render()">${UNIVS.map(uu=>`<option value="${uu.id}" ${uu.id===univSelected?"selected":""}>${uu.nom}</option>`).join("")}</select></div>
+        <select class="input" id="authUniv" onchange="state._signupUniv=this.value;captureSignup();render()">${UNIVS.map(uu=>`<option value="${uu.id}" ${uu.id===univSelected?"selected":""}>${uu.nom}</option>`).join("")}</select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Filière</label><select class="input" id="authFaculte">${(u&&u.facultes||[]).map(f=>`<option value="${f.id}">${f.nom}</option>`).join("")||'<option value="">—</option>'}</select></div>
-        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Année</label><select class="input" id="authAnnee">${["L1","L2","L3"].map(a=>`<option value="${a}">${a}</option>`).join("")}</select></div>
+        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Filière</label><select class="input" id="authFaculte">${(u&&u.facultes||[]).map(f=>`<option value="${f.id}" ${sf.faculte===f.id?"selected":""}>${f.nom}</option>`).join("")||'<option value="">—</option>'}</select></div>
+        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Année</label><select class="input" id="authAnnee">${["L1","L2","L3"].map(a=>`<option value="${a}" ${sf.annee===a?"selected":""}>${a}</option>`).join("")}</select></div>
       </div>
     `:`
       <div style="margin-bottom:12px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username"/></div>
       <div style="margin-bottom:12px"><input class="input" id="authPass" type="password" placeholder="Mot de passe" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()"/></div>
     `}
     <button class="btn btn-ink" style="width:100%" onclick="doAuth()">${signup?"Créer mon compte":"Se connecter"}</button>
+    ${!signup?'<div style="text-align:right;margin-top:6px"><a onclick="resetPassword()" style="font-size:12.5px;color:var(--accentDark);cursor:pointer">Mot de passe oublié ?</a></div>':""}
     <div id="authErr" style="color:#B4453A;font-size:13px;min-height:18px;margin-top:8px"></div>
     <div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span class="muted">ou</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
     <button class="btn btn-ghost" style="width:100%" onclick="googleAuth()">Continuer avec Google</button>
@@ -1745,12 +1959,20 @@ function AdminConsole(){
   if(a.view==="univ"){
     body=`<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;flex-wrap:wrap;gap:10px">
       <div><h2 class="serif" style="font-size:30px;color:var(--ink);margin:0 0 6px">Console admin</h2><p class="muted" style="margin:0">Descends dans la structure ou consulte les stats.</p></div>
-      <button class="btn btn-ink btn-sm" onclick="state.a.view='stats';render()">📊 Dashboard</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ink btn-sm" onclick="state.a.view='stats';render()">📊 Dashboard</button>
+        <button class="btn btn-ghost btn-sm" onclick="state.a.view='users';render()">👥 Utilisateurs</button>
+        <button class="btn btn-ghost btn-sm" onclick="state.a.view='applications';render()">📩 Candidatures tuteurs</button>
+      </div>
     </div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:32px">${UNIVS.map(u=>`<div class="card ${u.actif?"card-h":""}" style="padding:22px;${u.actif?"":"opacity:.55"}" ${u.actif?`onclick="aPickUniv('${u.id}')"`:""}><div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">${univLogoHTML(u)}${u.actif?'<span class="pill">Disponible</span>':'<span class="tag">Bientôt</span>'}</div><div style="font-weight:600;color:var(--ink);font-size:15px">${u.nom}</div><div class="muted">${u.ville}</div></div>`).join("")}</div>
     ${CategoriesAdmin()}`;
   } else if(a.view==="stats"){
     body=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px"><h2 class="serif" style="font-size:28px;color:var(--ink);margin:0">📊 Dashboard</h2><button class="btn btn-ghost btn-sm" onclick="state.a.view='univ';render()">← Retour</button></div>${AdminStatsView()}`;
+  } else if(a.view==="users"){
+    body=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px"><h2 class="serif" style="font-size:28px;color:var(--ink);margin:0">👥 Utilisateurs</h2><button class="btn btn-ghost btn-sm" onclick="state.a.view='univ';render()">← Retour</button></div>${AdminUsersView()}`;
+  } else if(a.view==="applications"){
+    body=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px"><h2 class="serif" style="font-size:28px;color:var(--ink);margin:0">📩 Candidatures tuteurs</h2><button class="btn btn-ghost btn-sm" onclick="state.a.view='univ';render()">← Retour</button></div>${AdminApplicationsView()}`;
   } else if(a.view==="fac"){
     body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.univ.nom}</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${a.univ.facultes.map(f=>`<div class="card card-h" style="padding:24px" onclick="aPickFac('${f.id}')"><h3 style="font-size:18px;color:var(--ink);font-weight:600;margin:0 0 6px">${f.nom}</h3><div class="muted">${state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===f.id).length} contenus</div></div>`).join("")}</div>`;
   } else if(a.view==="niv"){
@@ -1765,6 +1987,115 @@ function AdminConsole(){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">${aCrumb()}<button class="btn btn-ghost btn-sm" onclick="nav('landing')">Voir le site</button></div>
     ${body}</div>`;
 }
+/* ===== Onboarding (1ère connexion) ===== */
+function maybeShowOnboarding(){
+  if(!state.user||localStorage.getItem("studia_onboarded_"+state.user.email))return;
+  state.onboardingStep=1;render();
+}
+function nextOnboarding(){state.onboardingStep++;if(state.onboardingStep>3){closeOnboarding();}else render();}
+function closeOnboarding(){if(state.user)localStorage.setItem("studia_onboarded_"+state.user.email,"1");state.onboardingStep=0;render();}
+function renderOnboarding(){
+  if(!state.onboardingStep||state.onboardingStep<1)return "";
+  const steps=[
+    {title:"Bienvenue sur Studia 👋",text:"On t'aide à réussir ta licence avec les explications des majors de ta promo. Voici 3 trucs à connaître."},
+    {title:"📚 Ton espace personnel",text:"« Mon espace » dans le menu = ton tableau de bord avec tes matières par semestre, tes favoris et ta progression."},
+    {title:"⭐ Marque tes contenus préférés",text:"Clique sur l'étoile pour ajouter un cours à tes favoris. Note tes idées au fur et à mesure dans le panneau « Mes notes » sur chaque contenu."}
+  ];
+  const s=steps[state.onboardingStep-1];
+  return `<div class="onboarding-overlay" onclick="event.target===this&&closeOnboarding()"><div class="onboarding-card">
+    <button onclick="closeOnboarding()" style="position:absolute;top:14px;right:14px;background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer">✕</button>
+    <div style="font-size:42px;margin-bottom:12px">${["👋","📚","⭐"][state.onboardingStep-1]}</div>
+    <h2 class="serif" style="font-size:24px;color:var(--ink);margin:0 0 10px">${s.title}</h2>
+    <p style="color:var(--sub);font-size:15px;line-height:1.55;margin:0 0 22px">${s.text}</p>
+    <div style="display:flex;gap:6px;justify-content:center;margin-bottom:20px">${[1,2,3].map(i=>`<div style="width:24px;height:4px;border-radius:2px;background:${i===state.onboardingStep?"var(--accent)":"var(--border)"}"></div>`).join("")}</div>
+    <button class="btn btn-accent" style="width:100%" onclick="nextOnboarding()">${state.onboardingStep<3?"Suivant →":"C'est parti !"}</button>
+  </div></div>`;
+}
+
+/* ===== Candidature tuteur ===== */
+async function submitTutorApplication(){
+  const get=id=>(document.getElementById(id)||{}).value||"";
+  const data={prenom:get("taPrenom").trim(),nom:get("taNom").trim(),email:get("taEmail").trim(),phone:get("taPhone").trim(),univ:get("taUniv"),faculte:get("taFaculte"),annee:get("taAnnee"),matiere:get("taMatiere").trim(),note:get("taNote").trim(),message:get("taMessage").trim()};
+  if(!data.prenom||!data.nom||!data.email||!data.matiere||!data.note){toast("Champs obligatoires manquants","err");return;}
+  if(!sb){toast("Pas de connexion","err");return;}
+  if(!state.user){toast("Connecte-toi pour candidater","warn");nav("login");return;}
+  try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
+    const{error}=await sb.from("tutor_applications").insert({...data,user_id:u.user.id});
+    if(error){toast("Échec : "+error.message,"err",4000);return;}
+    toast("✓ Candidature envoyée ! On te répond sous 48h.","ok",4000);
+    state._taForm=null;state.tutorApplied=true;render();
+  }catch(e){toast("Erreur","err");}
+}
+
+/* ===== Admin : gestion utilisateurs ===== */
+async function loadAdminUsers(){
+  if(!sb)return;
+  state._usersLoading=true;render();
+  try{
+    const{data:profs}=await sb.from("profiles").select("*").order("created_at",{ascending:false});
+    const{data:subs}=await sb.from("subscribers").select("user_id,status");
+    const subMap={};(subs||[]).forEach(s=>{subMap[s.user_id]=s.status;});
+    state._users=(profs||[]).map(p=>({...p,subscribed:subMap[p.user_id]==="active"}));
+    state._usersLoading=false;render();
+  }catch(e){state._usersLoading=false;render();}
+}
+function AdminUsersView(){
+  if(!state._users){if(!state._usersLoading)loadAdminUsers();return '<div class="card" style="padding:40px;text-align:center;color:var(--muted)">⏳ Chargement…</div>';}
+  return `<div>
+    <input class="input" placeholder="🔍 Rechercher par nom ou email…" oninput="filterUsers(this.value)" value="${esc(state._usersQ||"")}" style="margin-bottom:14px"/>
+    <div id="usersListWrap">${usersListHTML()}</div>
+  </div>`;
+}
+function usersListHTML(){
+  const q=(state._usersQ||"").toLowerCase();
+  const users=q?state._users.filter(u=>(`${u.prenom||""} ${u.nom||""} ${u.email||""}`).toLowerCase().includes(q)):state._users;
+  return `<div class="muted" style="margin-bottom:10px">${users.length} utilisateur${users.length>1?"s":""}</div>
+    <div style="display:grid;gap:8px">
+      ${users.map(u=>{const nom=(`${u.prenom||""} ${u.nom||""}`).trim()||"(profil incomplet)";return `<div class="card" style="padding:14px 18px;display:flex;align-items:center;gap:14px">
+        <div class="founder-avatar" style="width:42px;height:42px;font-size:13px">${u.avatar_url?`<img src="${u.avatar_url}"/>`:getInitials(u,{email:""})||"?"}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:500;color:var(--ink);font-size:14.5px">${esc(nom)}${u.subscribed?'<span class="pill" style="margin-left:8px">✓ Abonné</span>':""}${ADMIN_EMAILS.has(u.email)?'<span class="tag" style="margin-left:6px;background:var(--accentSoft);color:var(--accentDark)">Admin</span>':""}</div>
+          <div class="muted" style="font-size:12px">${esc((univById(u.univ)||{}).nom||"—")} · ${esc(u.annee||"—")} · ${esc(u.phone||"pas de tel")}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="banUser('${u.user_id}','${esc(nom).replace(/'/g,"\\'")}')">Désactiver</button>
+      </div>`;}).join("")}
+    </div>`;
+}
+function filterUsers(v){state._usersQ=v;const el=document.getElementById("usersListWrap");if(el)el.innerHTML=usersListHTML();}
+async function loadAdminApplications(){
+  if(!sb)return;
+  state._appsLoading=true;render();
+  try{const{data}=await sb.from("tutor_applications").select("*").order("created_at",{ascending:false});state._apps=data||[];state._appsLoading=false;render();}catch(e){state._appsLoading=false;}
+}
+function AdminApplicationsView(){
+  if(!state._apps){if(!state._appsLoading)loadAdminApplications();return '<div class="card" style="padding:40px;text-align:center;color:var(--muted)">⏳ Chargement…</div>';}
+  if(!state._apps.length)return '<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucune candidature pour l\'instant.</div>';
+  return `<div style="display:grid;gap:10px">${state._apps.map(a=>`<div class="card" style="padding:18px">
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <div><div style="font-weight:600;color:var(--ink);font-size:15px">${esc((a.prenom||"")+" "+(a.nom||""))} <span class="muted" style="font-size:12px">· ${esc(a.email||"")}</span></div><div class="muted" style="font-size:12px">${esc((univById(a.univ)||{}).nom||"")} · ${esc(a.annee||"")} · 📞 ${esc(a.phone||"—")}</div></div>
+      <span class="tag" style="background:${a.status==='accepted'?'#E7F8EC;color:#1E8C3C':a.status==='rejected'?'#FBEDEC;color:#B4453A':'#FFF3D9;color:#9A6A18'}">${a.status||"pending"}</span>
+    </div>
+    <div style="font-size:14px;color:var(--text)"><b>Matière :</b> ${esc(a.matiere||"")} · <b>Note :</b> ${esc(a.note||"")}/20</div>
+    ${a.message?`<div style="margin-top:8px;font-size:13.5px;color:var(--sub);line-height:1.5;background:#FBFBFA;padding:10px 12px;border-radius:8px">${esc(a.message)}</div>`:""}
+    <div style="display:flex;gap:6px;margin-top:12px">
+      <button class="btn btn-accent btn-sm" onclick="updateApplication(${a.id},'accepted')">✓ Accepter</button>
+      <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="updateApplication(${a.id},'rejected')">✕ Rejeter</button>
+      <a class="btn btn-ghost btn-sm" href="mailto:${a.email}">📧 Email</a>
+      ${a.phone?`<a class="btn btn-ghost btn-sm" href="tel:${a.phone}">📞 Appeler</a>`:""}
+    </div>
+  </div>`).join("")}</div>`;
+}
+async function updateApplication(id,status){
+  if(!sb)return;
+  try{await sb.from("tutor_applications").update({status}).eq("id",id);toast("Statut mis à jour","ok");loadAdminApplications();}catch(e){toast("Erreur","err");}
+}
+
+async function banUser(user_id,nom){
+  if(!confirm(`Désactiver le compte de "${nom}" ? Le compte sera marqué inactif mais pas supprimé.`))return;
+  if(!sb)return;
+  try{await sb.from("profiles").update({bio:"[DÉSACTIVÉ]",updated_at:new Date().toISOString()}).eq("user_id",user_id);toast("Compte marqué désactivé","ok");loadAdminUsers();}catch(e){toast("Erreur","err");}
+}
+
 async function loadAdminStats(){
   if(!sb)return;
   state._statsLoading=true;render();
@@ -1965,7 +2296,7 @@ function updField(id,k,v){
   const c=state.contenus.find(x=>x.id===id);if(!c)return;c[k]=v;
   if(c.source==="seed")return;
   if(_updTimers[id+k])clearTimeout(_updTimers[id+k]);
-  _updTimers[id+k]=setTimeout(()=>{dbUpdateContenu(id,{[k]:v});},600);
+  _updTimers[id+k]=setTimeout(()=>{markSelfEdit(id);dbUpdateContenu(id,{[k]:v});},600);
 }
 async function delItem(id){
   const c=state.contenus.find(x=>x.id===id);
@@ -2047,6 +2378,35 @@ async function handleFiles(files){
 }
 async function regen(id){const c=state.contenus.find(x=>x.id===id);if(!c)return;c.outUrl=null;c.qr=null;render();await processRecord(c);render();}
 
+/* ===== Search modal ===== */
+function openSearch(){state.searchOpen=true;state.searchQuery="";renderSearchModal();setTimeout(()=>{const i=document.getElementById("searchInput");if(i)i.focus();},50);}
+function closeSearch(){state.searchOpen=false;renderSearchModal();}
+function onSearchInput(v){
+  state.searchQuery=v;
+  const rs=document.getElementById("searchResults");if(rs)rs.innerHTML=searchResultsHTML();
+  const ct=document.getElementById("searchCount");if(ct){const n=state.searchQuery.length<2?0:performSearch(state.searchQuery).length;ct.textContent=n+" résultat"+(n>1?"s":"");}
+}
+function openSearchResult(id){closeSearch();const c=state.contenus.find(x=>x.id===id);if(!c)return;state.univ=univById(c.univ);state.faculte=facById(c.univ,c.faculte);state.matiere=c.matiere;state.annee=c.annee;state.semestre=c.semestre||"S1";openItem(id);}
+function searchResultsHTML(){
+  if(state.searchQuery.length<2)return '<div class="muted" style="padding:30px;text-align:center">Tape au moins 2 caractères pour rechercher</div>';
+  const results=performSearch(state.searchQuery);
+  if(!results.length)return '<div class="muted" style="padding:30px;text-align:center">Aucun résultat pour "'+esc(state.searchQuery)+'"</div>';
+  return results.map(c=>{const u=univById(c.univ);return `<div class="search-item" onclick="openSearchResult('${c.id}')"><div class="ic" style="width:36px;height:36px">${smartIcon(c)}</div><div style="flex:1;min-width:0"><div style="font-weight:500;color:var(--ink);font-size:14.5px;margin-bottom:2px">${esc(c.titre||"")}</div><div class="muted" style="font-size:12px">${esc(c.matiere||"")} · ${labelFor(c.type)} · ${u?u.nom:""} ${c.annee||""}</div></div>${c.gratuit?'<span class="pill">Gratuit</span>':""}</div>`;}).join("");
+}
+function renderSearchModal(){
+  const root=document.getElementById("modalRoot");
+  if(!state.searchOpen){if(!state.modal&&!(state.newC&&state.newC.open))root.innerHTML="";return;}
+  const n=state.searchQuery.length<2?0:performSearch(state.searchQuery).length;
+  root.innerHTML=`<div class="search-overlay" onclick="closeSearch()"><div class="search-modal" onclick="event.stopPropagation()">
+    <div style="position:relative"><input class="input" id="searchInput" oninput="onSearchInput(this.value)" value="${esc(state.searchQuery||"")}" placeholder="🔍 Rechercher un cours, un TD, une matière, un tuteur..." style="padding:14px 16px;font-size:15px;border:0;border-bottom:1px solid var(--border);border-radius:14px 14px 0 0" autocomplete="off"/></div>
+    <div class="search-results" id="searchResults">${searchResultsHTML()}</div>
+    <div style="padding:10px 16px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between"><span id="searchCount">${n} résultat${n>1?"s":""}</span><span>Esc pour fermer</span></div>
+  </div></div>`;
+}
+document.addEventListener("keydown",e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();openSearch();}
+  if(e.key==="Escape"&&state.searchOpen)closeSearch();
+});
 function openVideoPreview(url){
   const v=parseVideoEmbed(url,true);
   if(!v){toast("URL vidéo invalide","err");return;}
@@ -2223,7 +2583,7 @@ function renderModal(){const r=document.getElementById("modalRoot");if(!state.mo
   r.innerHTML=`<div class="modal-bg" onclick="setModal(false)"><div class="modal fade" onclick="event.stopPropagation()"><div style="display:flex;justify-content:space-between"><span style="color:var(--accent)">✦</span><button style="background:none;border:none;color:var(--muted);cursor:pointer" onclick="setModal(false)">✕</button></div><h3 class="serif" style="font-size:26px;color:var(--ink);margin:12px 0 6px">Débloque tout Studia</h3><p style="font-size:14px;color:var(--sub);margin:0 0 18px;line-height:1.5">Accès illimité aux cours, TD et examens corrigés.</p><button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="startCheckout('semestre')">Pass semestriel — 39€</button><button class="btn btn-ghost" style="width:100%;margin-bottom:14px" onclick="startCheckout('mensuel')">Mensuel — 9€/mois</button>${hasStripe?'<p class="muted" style="text-align:center;margin:0">Paiement sécurisé via Stripe.</p>':`<div style="border-top:1px solid var(--border);padding-top:12px"><button class="btn btn-ink btn-sm" style="width:100%" onclick="subscribe()">Activer l'accès (démo)</button><p class="muted" style="text-align:center;margin-top:8px">Stripe non configuré — bouton démo.</p></div>`}</div></div>`;
 }
 
-window.addEventListener("load",()=>{if(typeof QRCode==="undefined")console.warn("QR lib non chargée");initSupabase();render();if(sb){Promise.all([loadAdmins(),loadCategories()]).then(()=>{loadContenus();loadHiddenMatieres();restoreSession();setupRealtime();});}});
+window.addEventListener("load",()=>{if(typeof QRCode==="undefined")console.warn("QR lib non chargée");initSupabase();render();if(sb){Promise.all([loadAdmins(),loadCategories()]).then(()=>{loadContenus();loadHiddenMatieres();restoreSession();setupRealtime();loadPublicStats();});}});
 </script>
 </body>
 </html>
