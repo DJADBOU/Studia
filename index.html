@@ -54,6 +54,7 @@ a{color:inherit;text-decoration:none}
 .seg{display:inline-flex;background:#F2F1EE;border-radius:10px;padding:4px;gap:2px;flex-wrap:wrap}
 .seg button{border:none;background:transparent;font-size:14px;font-weight:500;padding:8px 18px;border-radius:8px;color:var(--sub)}
 .seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.seg button.locked{color:var(--muted);opacity:.65;cursor:not-allowed}
 .seg.sm button{font-size:12.5px;padding:6px 11px}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px;flex-wrap:wrap}
 .tabs button{background:none;border:none;font-size:14.5px;padding:10px 14px;display:flex;align-items:center;gap:7px;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -484,7 +485,14 @@ function performSearch(q){
   const hasFilter=f.univ||f.faculte||f.annee;
   // Si aucun texte ET aucun filtre → rien. Avec un filtre seul, on liste tout ce qui matche.
   if(!ql&&!hasFilter)return [];
+  // Verrouillage : un étudiant non-admin ne voit que sa fac/filière + ses niveaux débloqués
+  const locked=state.user&&!isAdminUser()&&hasProfile();
+  const lockUniv=locked?state.profile.univ:null, lockFac=locked?state.profile.faculte:null;
+  const acc=locked?myAccess():null;
   return state.contenus.filter(c=>{
+    if(lockUniv&&c.univ!==lockUniv)return false;
+    if(lockFac&&c.faculte!==lockFac)return false;
+    if(acc&&!acc.allowed(c.annee,c.semestre||"S1"))return false;
     if(f.univ&&c.univ!==f.univ)return false;
     if(f.faculte&&c.faculte!==f.faculte)return false;
     if(f.annee&&c.annee!==f.annee)return false;
@@ -521,6 +529,53 @@ async function uploadAvatar(file){
     const avatar_url=urlData.publicUrl+"?t="+Date.now(); // cache bust
     await saveProfile({avatar_url});
     state.profile={...(state.profile||{}),avatar_url};
+    render();
+  }catch(e){toast("Erreur : "+e.message,"err");}
+}
+// ===== Documents privés (CV / relevé de notes) — bucket "documents", scopé par dossier {user_id}/ =====
+async function uploadDoc(file,kind){
+  // kind : "cv" | "releve"
+  if(!file||!sb||!state.user){toast("Pas connecté","err");return;}
+  const okTypes=["application/pdf","image/png","image/jpeg","image/jpg","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+  if(file.type&&!okTypes.includes(file.type)){toast("PDF, image ou Word uniquement","err",3500);return;}
+  if(file.size>10*1024*1024){toast("Fichier trop gros (max 10 Mo)","err",3500);return;}
+  const label=kind==="cv"?"CV":"relevé de notes";
+  toast("📤 Upload du "+label+"…","ok",1500);
+  try{
+    const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
+    const ext=(file.name.match(/\.[^.]+$/)||[".pdf"])[0].toLowerCase();
+    const path=`${u.user.id}/${kind}${ext}`;
+    // Nettoie d'éventuelles anciennes versions avec une autre extension
+    const oldPath=kind==="cv"?(state.profile||{}).cv_path:(state.profile||{}).releve_path;
+    if(oldPath&&oldPath!==path){try{await sb.storage.from("documents").remove([oldPath]);}catch(e){}}
+    const{error}=await sb.storage.from("documents").upload(path,file,{upsert:true,contentType:file.type||"application/octet-stream"});
+    if(error){toast("Échec upload : "+error.message,"err",4000);return;}
+    const field=kind==="cv"?"cv_path":"releve_path";
+    await saveProfile({[field]:path});
+    state.profile={...(state.profile||{}),[field]:path};
+    toast("✓ "+label.charAt(0).toUpperCase()+label.slice(1)+" enregistré","ok");
+    render();
+  }catch(e){toast("Erreur : "+e.message,"err");}
+}
+async function openDoc(path,filename){
+  if(!path||!sb)return;
+  try{
+    const{data,error}=await sb.storage.from("documents").createSignedUrl(path,3600,{download:filename||true});
+    if(error||!data){toast("Lien indisponible : "+((error&&error.message)||"erreur"),"err",4000);return;}
+    const a=document.createElement("a");a.href=data.signedUrl;a.download=filename||"";a.target="_blank";a.rel="noopener";document.body.appendChild(a);a.click();a.remove();
+  }catch(e){toast("Erreur : "+e.message,"err");}
+}
+async function deleteDoc(kind){
+  if(!sb||!state.user)return;
+  const label=kind==="cv"?"CV":"relevé de notes";
+  if(!confirm("Supprimer ton "+label+" ?"))return;
+  const field=kind==="cv"?"cv_path":"releve_path";
+  const path=(state.profile||{})[field];
+  try{
+    if(path){try{await sb.storage.from("documents").remove([path]);}catch(e){}}
+    await saveProfile({[field]:null});
+    state.profile={...(state.profile||{}),[field]:null};
+    toast("✓ "+label.charAt(0).toUpperCase()+label.slice(1)+" supprimé","ok");
     render();
   }catch(e){toast("Erreur : "+e.message,"err");}
 }
@@ -1246,8 +1301,53 @@ function selectUniv(id){
   }
   const u=univById(id);if(!u||!u.actif)return;state.univ=u;state.faculte=null;state.view="facultes";render();
 }
-function selectFaculte(fid){const f=facById(state.univ.id,fid);if(!f)return;state.faculte=f;state.annee="L1";state.view="programme";render();}
-function pickAnnee(a){state.annee=a;render();}
+function selectFaculte(fid){
+  // Lock : étudiant non-admin avec profil → ne peut accéder qu'à sa filière
+  if(state.user&&!isAdminUser()&&hasProfile()&&state.profile.faculte&&fid!==state.profile.faculte){
+    const myFac=facById(state.profile.univ,state.profile.faculte);
+    toast(`Tu es inscrit en ${myFac?myFac.nom:"ta filière"}`,"warn",3000);
+    return;
+  }
+  const f=facById(state.univ.id,fid);if(!f)return;state.faculte=f;
+  // Démarre sur le niveau réellement accessible (et non systématiquement L1)
+  const acc=myAccess();
+  state.annee=acc?acc.level:(state.profile&&state.profile.annee)||"L1";
+  state.semestre=acc?acc.semester:(state.profile&&state.profile.semestre)||"S1";
+  state.view="programme";render();
+}
+function pickAnnee(a){
+  // Lock : étudiant non-admin → bloque les années non encore débloquées (calendrier)
+  if(!canAccess(a,state.semestre||"S1")){
+    const acc=myAccess();const nu=acc&&acc.nextUnlock(a,state.semestre||"S1");
+    toast(nu?`${a} s'ouvrira en ${nu}`:`${a} n'est pas encore accessible`,"warn",3200);
+    return;
+  }
+  state.annee=a;render();
+}
+function pickMcAnnee(a){
+  if(!canAccess(a,state.semestre||"S1")){
+    const acc=myAccess();const nu=acc&&acc.nextUnlock(a,state.semestre||"S1");
+    toast(nu?`${a} s'ouvrira en ${nu}`:`${a} n'est pas encore accessible`,"warn",3200);
+    return;
+  }
+  state.mcAnnee=a;render();
+}
+function pickSemestre(s,annee){
+  annee=annee||state.annee||state.mcAnnee||(state.profile&&state.profile.annee)||"L1";
+  if(!canAccess(annee,s)){
+    const acc=myAccess();const nu=acc&&acc.nextUnlock(annee,s);
+    toast(nu?`Le semestre ${s} s'ouvrira en ${nu}`:`${s} n'est pas encore accessible`,"warn",3200);
+    return;
+  }
+  state.semestre=s;render();
+}
+// Boutons « segments » année/semestre avec verrou visuel selon le calendrier universitaire
+function anneeSegHTML(currentAnnee,picker){
+  return ["L1","L2","L3"].map(y=>{const locked=!canAccess(y,state.semestre||"S1");return `<button class="${currentAnnee===y?"on":""}${locked?" locked":""}" onclick="${picker}('${y}')"${locked?' title="Pas encore débloqué"':""}>${y}${locked?" 🔒":""}</button>`;}).join("");
+}
+function semSegHTML(currentSem,annee){
+  return ["S1","S2"].map(s=>{const locked=!canAccess(annee||"L1",s);return `<button class="${currentSem===s?"on":""}${locked?" locked":""}" onclick="pickSemestre('${s}','${annee||""}')"${locked?' title="Pas encore débloqué"':""}>${s}${locked?" 🔒":""}</button>`;}).join("");
+}
 function openMatiere(m){if(m==null||m==="")return;state.matiere=m;state.tab=(allCategories()[0]||{id:"Cours"}).id;state.view="matiere";render();}
 function setTab(t){state.tab=t;render();}
 async function openItem(id){
@@ -1303,7 +1403,11 @@ async function doAuth(){
   // Collecte des champs profil au signup
   const profileData=isSignup?{
     prenom:get("authPrenom"),nom:get("authNom"),phone:get("authPhone"),
-    univ:get("authUniv")||"uca",faculte:get("authFaculte"),annee:get("authAnnee")||"L1"
+    birthdate:get("authBirth")||null,genre:get("authGenre")||null,
+    ville:get("authVille")||null,adresse:get("authAdresse")||null,
+    univ:get("authUniv")||"uca",faculte:get("authFaculte"),
+    annee:get("authAnnee")||"L1",semestre:get("authSemestre")||"S1",
+    linkedin:get("authLinkedin")||null
   }:null;
   if(isSignup){
     if(!profileData.prenom||!profileData.nom){if(err)err.textContent="Prénom et nom requis.";return;}
@@ -1527,6 +1631,61 @@ function MobileMenu(){
   ${state.subscribed?"":`<button onclick="setModal(true)">S'abonner</button>`}
 </div></div>`;}
 function hasProfile(){const p=state.profile;return !!(p&&p.univ&&p.faculte);}
+
+/* ===== Progression temporelle (déblocage par calendrier universitaire) =====
+   Règle : l'étudiant s'inscrit à un niveau (L1/L2/L3) + un semestre.
+   - Le niveau suivant s'ouvre automatiquement en SEPTEMBRE (rentrée).
+   - Le S1 est dispo dès la rentrée (septembre), le S2 s'ouvre vers JANVIER.
+   - Les années DÉJÀ passées restent accessibles ; les années futures sont verrouillées.
+   - Les admins ne sont jamais limités. */
+const LEVELS=["L1","L2","L3"];
+const UNLOCK={ september:8 /*mois 0-indexé : 8=septembre*/, january:0 };
+// Année calendaire du septembre qui ouvre l'année universitaire contenant la date d.
+function academicYearStartYear(d){const m=d.getMonth();return m>=UNLOCK.september?d.getFullYear():d.getFullYear()-1;}
+const MONTHS_FR=["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+// Calcule l'accès courant d'un étudiant à partir de son profil (et d'une date, mockable pour les tests).
+function studentAccess(profile,now){
+  now=now||new Date();
+  profile=profile||{};
+  const baseIdx=Math.max(0,LEVELS.indexOf(profile.annee||"L1"));
+  const enrolled=profile.created_at?new Date(profile.created_at):now;
+  const baseAY=academicYearStartYear(enrolled);
+  const curAY=academicYearStartYear(now);
+  let yearsElapsed=curAY-baseAY; if(yearsElapsed<0)yearsElapsed=0;
+  let curIdx=baseIdx+yearsElapsed; if(curIdx>LEVELS.length-1)curIdx=LEVELS.length-1;
+  const m=now.getMonth();
+  // Dans l'année univ courante : sept→déc = S1 seul ; janv→août = S2 ouvert.
+  const s2Unlocked = (m>=UNLOCK.january && m<UNLOCK.september);
+  const curSem = s2Unlocked ? "S2" : "S1";
+  function allowed(annee,sem){
+    const ai=LEVELS.indexOf(annee);
+    if(ai<0)return true;            // type inconnu (Master, etc.) → on ne bloque pas
+    if(ai<curIdx)return true;       // années passées : tout ouvert
+    if(ai>curIdx)return false;      // années futures : verrouillées
+    if((sem||"S1")==="S2")return s2Unlocked; // année courante : S2 selon calendrier
+    return true;
+  }
+  // Date lisible de la prochaine ouverture (pour message UI).
+  function nextUnlock(annee,sem){
+    const ai=LEVELS.indexOf(annee);
+    if(ai===curIdx && (sem||"S1")==="S2" && !s2Unlocked){
+      return `janvier ${curAY+1}`; // S2 de l'année en cours ouvre en janvier prochain
+    }
+    if(ai>curIdx){
+      const yearsToWait=ai-curIdx;
+      return `septembre ${curAY+yearsToWait}`;
+    }
+    return null;
+  }
+  return {levelIdx:curIdx, level:LEVELS[curIdx], semester:curSem, s2Unlocked, allowed, nextUnlock};
+}
+// Accès de l'étudiant connecté (null si admin ou pas de profil → pas de limite).
+function myAccess(){
+  if(!state.user||isAdminUser()||!hasProfile())return null;
+  return studentAccess(state.profile);
+}
+// Vrai si l'étudiant courant peut voir cette (année, semestre). Admin/visiteur : toujours vrai.
+function canAccess(annee,sem){const a=myAccess();return a?a.allowed(annee,sem):true;}
 function Nav(){
   const showMyEspace=!!state.user;
   const isLockedStudent=state.user&&!isAdminUser()&&hasProfile();
@@ -1648,8 +1807,8 @@ function MyCoursesView(){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:14px;flex-wrap:wrap">
       <h2 class="serif" style="font-size:24px;color:var(--ink);margin:0">Tes matières en ${annee} · ${sem}</h2>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <div class="seg">${["L1","L2","L3"].map(y=>`<button class="${annee===y?"on":""}" onclick="state.mcAnnee='${y}';render()">${y}</button>`).join("")}</div>
-        <div class="seg">${["S1","S2"].map(s=>`<button class="${sem===s?"on":""}" onclick="state.semestre='${s}';render()">${s}</button>`).join("")}</div>
+        <div class="seg">${anneeSegHTML(annee,"pickMcAnnee")}</div>
+        <div class="seg">${semSegHTML(sem,annee)}</div>
       </div>
     </div>
 
@@ -1704,8 +1863,8 @@ function Programme(){
     <h1 class="serif" style="font-size:40px;color:var(--ink);margin:0 0 6px">${state.faculte.nom}</h1>
     <p style="font-size:15px;color:var(--sub);margin:0 0 24px">Choisis ton niveau, ton semestre, puis ta matière.</p>
     <div style="display:flex;gap:14px;margin-bottom:28px;flex-wrap:wrap">
-      <div class="seg">${["L1","L2","L3"].map(y=>`<button class="${a===y?"on":""}" onclick="pickAnnee('${y}')">${y}</button>`).join("")}</div>
-      <div class="seg">${["S1","S2"].map(s=>`<button class="${sem===s?"on":""}" onclick="state.semestre='${s}';render()">${s}</button>`).join("")}</div>
+      <div class="seg">${anneeSegHTML(a,"pickAnnee")}</div>
+      <div class="seg">${semSegHTML(sem,a)}</div>
     </div>
     ${mats.length?`<div class="mat-grid">
       ${mats.map(m=>{const counts=allCategories().map(c=>({c,n:countMat(uid,fid,a,m,c.id,sem)}));const total=counts.reduce((s,x)=>s+x.n,0);return `<div class="matiere-card" onclick="openMatiere('${esc(m).replace(/'/g,"\\'")}')">
@@ -2021,6 +2180,25 @@ function fmtRelativeDate(iso){
   if(diff<604800)return `il y a ${Math.floor(diff/86400)}j`;
   return d.toLocaleDateString("fr-FR");
 }
+function ageFromBirthdate(iso){if(!iso)return null;const b=new Date(iso);if(isNaN(b))return null;const n=new Date();let a=n.getFullYear()-b.getFullYear();const md=n.getMonth()-b.getMonth();if(md<0||(md===0&&n.getDate()<b.getDate()))a--;return a>=0&&a<130?a:null;}
+function fmtBirthdate(iso){if(!iso)return "";const d=new Date(iso);if(isNaN(d))return iso;return d.toLocaleDateString("fr-FR");}
+function profileInfoRow(label,value){if(!value)return "";return `<div style="display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--border)"><span class="muted">${label}</span><span style="text-align:right;color:var(--text)">${value}</span></div>`;}
+function profileDocRow(kind,label,icon,path,nom){
+  const ext=path?(String(path).match(/\.[^.]+$/)||[""])[0]:"";
+  const fname=(label.replace(/[^\wÀ-ÿ]+/g,"_")+"_"+(nom||"etudiant")+ext);
+  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)">
+    <div style="display:flex;align-items:center;gap:12px;min-width:0">
+      <div class="ic">${icon}</div>
+      <div style="min-width:0"><div style="font-weight:500;color:var(--ink);font-size:14.5px">${label}</div>
+      <div class="muted" style="font-size:12.5px">${path?"✓ Document déposé":"Aucun fichier — optionnel"}</div></div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+      ${path?`<button class="btn btn-ghost btn-sm" onclick="openDoc('${esc(String(path))}','${esc(fname)}')">Voir</button>`:""}
+      <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0">${path?"Remplacer":"Déposer"}<input type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,image/*,application/pdf" style="display:none" onchange="uploadDoc(this.files[0],'${kind}')"/></label>
+      ${path?`<button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="deleteDoc('${kind}')">Suppr.</button>`:""}
+    </div>
+  </div>`;
+}
 function ProfileView(){
   if(!state.user){return `<div class="wrap fade"><div class="page-content"><h1>Connecte-toi pour voir ton profil.</h1><button class="btn btn-ink" onclick="nav('login')">Se connecter</button></div></div>`;}
   const p=state.profile||{};
@@ -2029,7 +2207,50 @@ function ProfileView(){
   const avatarUrl=p.avatar_url||null;
   const editing=state.editProfile;
   const pf=state._profForm||{};
-  const nom=pf.nom!==undefined?pf.nom:(p.nom||""), prenom=pf.prenom!==undefined?pf.prenom:(p.prenom||""), univ=pf.univ||p.univ||"uca", faculte=pf.faculte!==undefined?pf.faculte:(p.faculte||""), annee=pf.annee||p.annee||"L1", bio=pf.bio!==undefined?pf.bio:(p.bio||"");
+  const isAdmin=isAdminUser();
+  const GENRES=["Homme","Femme","Autre","Non précisé"];
+  const univNameOf=uid=>(univById(uid)||{}).nom||"";
+  const facNameOf=(uid,fid)=>(((univById(uid)||{facultes:[]}).facultes.find(f=>f.id===fid)||{}).nom||"");
+  const v={
+    prenom: pf.prenom!==undefined?pf.prenom:(p.prenom||""),
+    nom: pf.nom!==undefined?pf.nom:(p.nom||""),
+    birthdate: pf.birthdate!==undefined?pf.birthdate:(p.birthdate||""),
+    genre: pf.genre!==undefined?pf.genre:(p.genre||""),
+    phone: pf.phone!==undefined?pf.phone:(p.phone||""),
+    ville: pf.ville!==undefined?pf.ville:(p.ville||""),
+    adresse: pf.adresse!==undefined?pf.adresse:(p.adresse||""),
+    linkedin: pf.linkedin!==undefined?pf.linkedin:(p.linkedin||""),
+    bio: pf.bio!==undefined?pf.bio:(p.bio||""),
+    univ: pf.univ||p.univ||"uca",
+    faculte: pf.faculte!==undefined?pf.faculte:(p.faculte||""),
+    annee: pf.annee||p.annee||"L1",
+    semestre: pf.semestre||p.semestre||"S1"
+  };
+  // Étudiant déjà inscrit (univ+filière fixés) → cursus verrouillé. Admin jamais limité. 1re complétion autorisée.
+  const cursusLocked = !isAdmin && !!(p.univ && p.faculte);
+  const access = (!isAdmin && p.annee && p.faculte) ? studentAccess(p) : null;
+  const SL='font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px';
+  const cursusEdit = cursusLocked
+    ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:6px">🔒 Cursus verrouillé</div>
+         <div style="font-size:13.5px;color:var(--text)"><b>${esc(univNameOf(p.univ))}</b> · ${esc(facNameOf(p.univ,p.faculte))} · ${esc(p.annee||"")} · ${esc(p.semestre||"S1")}</div>
+         <p class="muted" style="font-size:11.5px;margin:6px 0 0;line-height:1.4">Ton université, ta filière, ton année et ton semestre sont fixés à l'inscription et ne sont pas modifiables. Pour les corriger, écris à <b>studia.contact@gmail.com</b>.</p>
+       </div>`
+    : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+         <select class="input" id="pUniv" onchange="captureProfile();render()">${UNIVS.map(u=>`<option value="${u.id}" ${v.univ===u.id?"selected":""}>${esc(u.nom)}</option>`).join("")}</select>
+         <select class="input" id="pFaculte">${(univById(v.univ)||{facultes:[]}).facultes.map(f=>`<option value="${f.id}" ${v.faculte===f.id?"selected":""}>${esc(f.nom)}</option>`).join("")||'<option value="">—</option>'}</select>
+         <select class="input" id="pAnnee">${["L1","L2","L3"].map(a=>`<option value="${a}" ${v.annee===a?"selected":""}>${a}</option>`).join("")}</select>
+         <select class="input" id="pSemestre">${["S1","S2"].map(x=>`<option ${v.semestre===x?"selected":""}>${x}</option>`).join("")}</select>
+       </div>`;
+  // Indices de déblocage à venir (pour l'étudiant)
+  let accessHints="";
+  if(access){
+    const hints=[];
+    if(!access.s2Unlocked){const nu=access.nextUnlock(access.level,"S2");if(nu)hints.push(`Le <b>semestre 2</b> de ${access.level} s'ouvrira en <b>${nu}</b>.`);}
+    if(access.levelIdx<LEVELS.length-1){const nl=LEVELS[access.levelIdx+1];const nu=access.nextUnlock(nl,"S1");if(nu)hints.push(`<b>${nl}</b> s'ouvrira automatiquement en <b>${nu}</b>.`);}
+    accessHints=hints.length?`<div style="margin-top:12px;display:grid;gap:7px">${hints.map(h=>`<div style="font-size:13px;color:var(--sub);display:flex;gap:8px;align-items:flex-start"><span>🗓️</span><span>${h}</span></div>`).join("")}</div>`:"";
+  }
+  const age=ageFromBirthdate(p.birthdate);
   return `<div class="wrap fade" style="padding:40px 0;max-width:900px">
     <div class="card" style="padding:32px;margin-bottom:22px">
       <div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
@@ -2039,24 +2260,34 @@ function ProfileView(){
         </div>
         <div style="flex:1;min-width:240px">
           ${editing?`
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-              <input class="input" id="pPrenom" placeholder="Prénom" value="${esc(prenom)}"/>
-              <input class="input" id="pNom" placeholder="Nom" value="${esc(nom)}"/>
+            <div style="${SL};margin-top:0">Identité</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+              <input class="input" id="pPrenom" placeholder="Prénom" value="${esc(v.prenom)}"/>
+              <input class="input" id="pNom" placeholder="Nom" value="${esc(v.nom)}"/>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
-              <select class="input" id="pUniv" onchange="captureProfile();render()">${UNIVS.map(u=>`<option value="${u.id}" ${univ===u.id?"selected":""}>${u.nom}</option>`).join("")}</select>
-              <select class="input" id="pFaculte">${(univById(univ)||{facultes:[]}).facultes.map(f=>`<option value="${f.id}" ${faculte===f.id?"selected":""}>${f.nom}</option>`).join("")}</select>
-              <select class="input" id="pAnnee">${["L1","L2","L3"].map(a=>`<option value="${a}" ${annee===a?"selected":""}>${a}</option>`).join("")}</select>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+              <div><label class="muted" style="font-size:10.5px;display:block;margin-bottom:3px">Date de naissance</label><input class="input" id="pBirth" type="date" value="${esc(v.birthdate)}"/></div>
+              <div><label class="muted" style="font-size:10.5px;display:block;margin-bottom:3px">Genre</label><select class="input" id="pGenre"><option value="">—</option>${GENRES.map(g=>`<option ${v.genre===g?"selected":""}>${g}</option>`).join("")}</select></div>
             </div>
-            <textarea class="input" id="pBio" rows="2" placeholder="Quelques mots sur toi (optionnel)" style="resize:vertical">${esc(bio)}</textarea>
-            <div style="display:flex;gap:8px;margin-top:10px">
+            <div style="${SL}">Contact &amp; adresse</div>
+            <div style="margin-bottom:8px"><input class="input" id="pPhone" type="tel" placeholder="Téléphone (+33…)" value="${esc(v.phone)}"/></div>
+            <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-bottom:8px">
+              <input class="input" id="pVille" placeholder="Ville" value="${esc(v.ville)}"/>
+              <input class="input" id="pAdresse" placeholder="Adresse postale" value="${esc(v.adresse)}"/>
+            </div>
+            <div style="margin-bottom:8px"><input class="input" id="pLinkedin" type="url" placeholder="Profil LinkedIn (https://…)" value="${esc(v.linkedin)}"/></div>
+            <div style="${SL}">Cursus</div>
+            ${cursusEdit}
+            <div style="${SL}">À propos</div>
+            <textarea class="input" id="pBio" rows="2" placeholder="Quelques mots sur toi (optionnel)" style="resize:vertical">${esc(v.bio)}</textarea>
+            <div style="display:flex;gap:8px;margin-top:14px">
               <button class="btn btn-accent btn-sm" onclick="submitProfile()">Enregistrer</button>
               <button class="btn btn-ghost btn-sm" onclick="state.editProfile=false;state._profForm=null;render()">Annuler</button>
             </div>
           `:`
-            <h1 class="serif" style="font-size:32px;color:var(--ink);margin:0 0 4px;line-height:1.1">${esc((prenom+" "+nom).trim())||state.user.email.split("@")[0]}</h1>
+            <h1 class="serif" style="font-size:32px;color:var(--ink);margin:0 0 4px;line-height:1.1">${esc((v.prenom+" "+v.nom).trim())||state.user.email.split("@")[0]}</h1>
             <div class="muted" style="margin-bottom:8px">${esc(state.user.email)}</div>
-            ${p.univ?`<div style="font-size:14px;color:var(--text)"><b>${esc((univById(p.univ)||{}).nom||"")}</b>${p.faculte?" · "+esc(((univById(p.univ)||{facultes:[]}).facultes.find(f=>f.id===p.faculte)||{}).nom||""):""}${p.annee?" · "+p.annee:""}</div>`:'<div class="muted">Profil pas encore complété</div>'}
+            ${p.univ?`<div style="font-size:14px;color:var(--text)"><b>${esc(univNameOf(p.univ))}</b>${p.faculte?" · "+esc(facNameOf(p.univ,p.faculte)):""}${p.annee?" · "+esc(p.annee):""}${p.semestre?" · "+esc(p.semestre):""}</div>`:'<div class="muted">Profil pas encore complété</div>'}
             ${p.bio?`<p style="margin:10px 0 0;color:var(--sub);font-size:14px;line-height:1.5">${esc(p.bio)}</p>`:""}
             <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn-ghost btn-sm" onclick="state.editProfile=true;render()">${p.nom?"Modifier mon profil":"Compléter mon profil"}</button>
@@ -2066,6 +2297,39 @@ function ProfileView(){
         </div>
       </div>
     </div>
+
+    ${(p.univ||access)?`<div class="card" style="padding:24px 26px;margin-bottom:22px">
+      <div style="display:flex;align-items:center;gap:8px;margin:0 0 14px"><h2 class="serif" style="font-size:22px;color:var(--ink);margin:0">Mon cursus</h2>${cursusLocked?'<span class="tag amber">🔒 Verrouillé</span>':""}</div>
+      <div style="display:grid;gap:0;font-size:14.5px">
+        ${profileInfoRow("Université",esc(univNameOf(p.univ)))}
+        ${profileInfoRow("Filière",esc(facNameOf(p.univ,p.faculte)))}
+        ${profileInfoRow("Année",esc(p.annee||""))}
+        ${profileInfoRow("Semestre",esc(p.semestre||""))}
+      </div>
+      ${access?`<div style="margin-top:14px;background:var(--accentSoft);border:1px solid #CFEAD7;border-radius:10px;padding:14px 16px">
+        <div style="font-size:13.5px;color:var(--text)">Tu as actuellement accès à <b>${access.level} · ${access.semester}</b>${access.levelIdx>0?` et à toutes les années précédentes`:""}.</div>
+        ${accessHints}
+      </div>`:""}
+    </div>`:""}
+
+    <div class="card" style="padding:24px 26px;margin-bottom:22px">
+      <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 14px">Mes documents</h2>
+      ${profileDocRow("cv","CV","📄",p.cv_path,p.nom)}
+      ${profileDocRow("releve","Relevé de notes","🎓",p.releve_path,p.nom)}
+      <p class="muted" style="font-size:11.5px;line-height:1.45;margin:12px 0 0">🔒 Tes documents sont <b>privés</b> : seuls toi et l'équipe Studia pouvez y accéder. PDF, image ou Word, 10 Mo max.</p>
+    </div>
+
+    ${(p.phone||p.birthdate||p.genre||p.ville||p.adresse||p.linkedin)?`<div class="card" style="padding:24px 26px;margin-bottom:22px">
+      <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 8px">Mes informations</h2>
+      <div style="display:grid;gap:0;font-size:14.5px">
+        ${profileInfoRow("Téléphone",esc(p.phone||""))}
+        ${profileInfoRow("Date de naissance",p.birthdate?esc(fmtBirthdate(p.birthdate))+(age!=null?` (${age} ans)`:""):"")}
+        ${profileInfoRow("Genre",esc(p.genre||""))}
+        ${profileInfoRow("Ville",esc(p.ville||""))}
+        ${profileInfoRow("Adresse",esc(p.adresse||""))}
+        ${p.linkedin?`<div style="display:flex;justify-content:space-between;gap:14px;padding:9px 0"><span class="muted">LinkedIn</span><a href="${esc(p.linkedin)}" target="_blank" rel="noopener noreferrer" style="color:var(--accentDark);text-align:right;word-break:break-all">Voir le profil ↗</a></div>`:""}
+      </div>
+    </div>`:""}
 
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:22px">
       <div class="card" style="padding:22px"><div class="muted" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px">Contenus vus</div><div class="serif" style="font-size:36px;color:var(--ink);line-height:1">${s.count}</div></div>
@@ -2093,13 +2357,25 @@ function ProfileView(){
     </div>
   </div>`;
 }
+// Correspondance id du DOM → clé du profil
+const PROFILE_FIELD_MAP={pPrenom:"prenom",pNom:"nom",pBirth:"birthdate",pGenre:"genre",pPhone:"phone",pVille:"ville",pAdresse:"adresse",pLinkedin:"linkedin",pBio:"bio",pUniv:"univ",pFaculte:"faculte",pAnnee:"annee",pSemestre:"semestre"};
 function captureProfile(){
   const g=id=>{const e=document.getElementById(id);return e?e.value:undefined;};
-  state._profForm={prenom:g("pPrenom"),nom:g("pNom"),univ:g("pUniv"),faculte:g("pFaculte"),annee:g("pAnnee"),bio:g("pBio")};
+  const next={...(state._profForm||{})};
+  Object.keys(PROFILE_FIELD_MAP).forEach(id=>{const val=g(id);if(val!==undefined)next[PROFILE_FIELD_MAP[id]]=val;});
+  state._profForm=next;
 }
 async function submitProfile(){
-  const get=id=>(document.getElementById(id)||{}).value||"";
-  const fields={prenom:get("pPrenom").trim(),nom:get("pNom").trim(),univ:get("pUniv"),faculte:get("pFaculte"),annee:get("pAnnee"),bio:get("pBio").trim()};
+  const get=id=>{const e=document.getElementById(id);return e?(e.value||"").trim():undefined;};
+  const fields={};
+  // Ne sauvegarde QUE les champs réellement présents dans le DOM (les champs cursus verrouillés
+  // n'existent pas → ils ne sont pas écrasés). Chaîne vide → null (sauf prénom/nom).
+  Object.keys(PROFILE_FIELD_MAP).forEach(id=>{
+    const val=get(id);if(val===undefined)return;
+    const key=PROFILE_FIELD_MAP[id];
+    fields[key]=(val===""&&key!=="prenom"&&key!=="nom")?null:val;
+  });
+  if(Object.keys(fields).length===0){state.editProfile=false;state._profForm=null;render();return;}
   const r=await saveProfile(fields);
   if(r.ok){state.editProfile=false;state._profForm=null;render();}
 }
@@ -2204,38 +2480,60 @@ function DroitsView(){
 /* ===== Login ===== */
 function captureSignup(){
   const g=id=>{const e=document.getElementById(id);return e?e.value:undefined;};
-  state._signupForm={...(state._signupForm||{}),prenom:g("authPrenom"),nom:g("authNom"),phone:g("authPhone"),email:g("authEmail"),pass:g("authPass"),faculte:g("authFaculte"),annee:g("authAnnee")};
+  state._signupForm={...(state._signupForm||{}),prenom:g("authPrenom"),nom:g("authNom"),phone:g("authPhone"),birthdate:g("authBirth"),genre:g("authGenre"),ville:g("authVille"),adresse:g("authAdresse"),email:g("authEmail"),pass:g("authPass"),faculte:g("authFaculte"),annee:g("authAnnee"),semestre:g("authSemestre"),linkedin:g("authLinkedin")};
 }
 function LoginView(){
   const signup=state.authMode==="signup";
   const univSelected=state._signupUniv||"uca";
   const u=univById(univSelected);
   const sf=state._signupForm||{};
-  return `<div class="wrap fade" style="max-width:440px;padding:60px 0"><div class="card" style="padding:32px">
+  const SL='font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:18px 0 9px';
+  const genres=["Homme","Femme","Autre","Non précisé"];
+  return `<div class="wrap fade" style="max-width:${signup?"540px":"440px"};padding:60px 0"><div class="card" style="padding:32px">
     <div class="logo" style="margin-bottom:16px">S</div>
     <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:20px">
       <button class="auth-tab ${!signup?"on":""}" onclick="setAuthMode('login')">Connexion</button>
       <button class="auth-tab ${signup?"on":""}" onclick="setAuthMode('signup')">Inscription</button>
     </div>
     ${signup?`
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="${SL};margin-top:0">Identité</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <input class="input" id="authPrenom" placeholder="Prénom" value="${esc(sf.prenom||'')}"/>
         <input class="input" id="authNom" placeholder="Nom" value="${esc(sf.nom||'')}"/>
       </div>
-      <div style="margin-bottom:10px"><input class="input" id="authPhone" type="tel" placeholder="Numéro de téléphone (+33…)" value="${esc(sf.phone||'')}"/></div>
-      <div style="margin-bottom:10px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username" value="${esc(sf.email||'')}"/></div>
-      <div style="margin-bottom:10px"><input class="input" id="authPass" type="password" placeholder="Mot de passe (6+ caractères)" autocomplete="new-password" value="${esc(sf.pass||'')}" onkeydown="if(event.key==='Enter')doAuth()"/></div>
-      <div style="margin-bottom:10px"><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Mon université</label>
-        <select class="input" id="authUniv" onchange="state._signupUniv=this.value;captureSignup();render()">${UNIVS.map(uu=>`<option value="${uu.id}" ${uu.id===univSelected?"selected":""}>${uu.nom}</option>`).join("")}</select></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Filière</label><select class="input" id="authFaculte">${(u&&u.facultes||[]).map(f=>`<option value="${f.id}" ${sf.faculte===f.id?"selected":""}>${f.nom}</option>`).join("")||'<option value="">—</option>'}</select></div>
-        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Année</label><select class="input" id="authAnnee">${["L1","L2","L3"].map(a=>`<option value="${a}" ${sf.annee===a?"selected":""}>${a}</option>`).join("")}</select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div><label class="muted" style="font-size:10.5px;display:block;margin-bottom:3px">Date de naissance</label><input class="input" id="authBirth" type="date" value="${esc(sf.birthdate||'')}"/></div>
+        <div><label class="muted" style="font-size:10.5px;display:block;margin-bottom:3px">Genre</label><select class="input" id="authGenre"><option value="">—</option>${genres.map(g=>`<option ${sf.genre===g?"selected":""}>${g}</option>`).join("")}</select></div>
       </div>
+
+      <div style="${SL}">Connexion &amp; contact</div>
+      <div style="margin-bottom:8px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username" value="${esc(sf.email||'')}"/></div>
+      <div style="margin-bottom:8px"><input class="input" id="authPass" type="password" placeholder="Mot de passe (6+ caractères)" autocomplete="new-password" value="${esc(sf.pass||'')}"/></div>
+      <div style="margin-bottom:8px"><input class="input" id="authPhone" type="tel" placeholder="Numéro de téléphone (+33…)" value="${esc(sf.phone||'')}"/></div>
+
+      <div style="${SL}">Adresse</div>
+      <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-bottom:8px">
+        <input class="input" id="authVille" placeholder="Ville" value="${esc(sf.ville||'')}"/>
+        <input class="input" id="authAdresse" placeholder="Adresse postale" value="${esc(sf.adresse||'')}"/>
+      </div>
+
+      <div style="${SL}">Cursus</div>
+      <div style="margin-bottom:8px"><label class="muted" style="font-size:10.5px;display:block;margin-bottom:3px">Université</label>
+        <select class="input" id="authUniv" onchange="state._signupUniv=this.value;captureSignup();render()">${UNIVS.map(uu=>`<option value="${uu.id}" ${uu.id===univSelected?"selected":""}>${uu.nom}</option>`).join("")}</select></div>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <div><label class="muted" style="font-size:10.5px;display:block;margin-bottom:3px">Filière</label><select class="input" id="authFaculte">${(u&&u.facultes||[]).map(f=>`<option value="${f.id}" ${sf.faculte===f.id?"selected":""}>${f.nom}</option>`).join("")||'<option value="">—</option>'}</select></div>
+        <div><label class="muted" style="font-size:10.5px;display:block;margin-bottom:3px">Année</label><select class="input" id="authAnnee">${["L1","L2","L3"].map(a=>`<option value="${a}" ${sf.annee===a?"selected":""}>${a}</option>`).join("")}</select></div>
+        <div><label class="muted" style="font-size:10.5px;display:block;margin-bottom:3px">Semestre</label><select class="input" id="authSemestre">${["S1","S2"].map(s=>`<option ${(sf.semestre||"S1")===s?"selected":""}>${s}</option>`).join("")}</select></div>
+      </div>
+
+      <div style="${SL}">Optionnel</div>
+      <div style="margin-bottom:8px"><input class="input" id="authLinkedin" type="url" placeholder="Profil LinkedIn (https://…)" value="${esc(sf.linkedin||'')}"/></div>
+      <p class="muted" style="font-size:11px;line-height:1.45;margin:2px 0 0">📎 Ton <b>CV</b> et ton <b>relevé de notes</b> se déposent depuis ton profil, juste après la création du compte.</p>
     `:`
       <div style="margin-bottom:12px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username"/></div>
       <div style="margin-bottom:12px"><input class="input" id="authPass" type="password" placeholder="Mot de passe" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()"/></div>
     `}
-    <button class="btn btn-ink" style="width:100%" onclick="doAuth()">${signup?"Créer mon compte":"Se connecter"}</button>
+    <button class="btn btn-ink" style="width:100%;margin-top:18px" onclick="doAuth()">${signup?"Créer mon compte":"Se connecter"}</button>
     ${!signup?'<div style="text-align:right;margin-top:6px"><a onclick="resetPassword()" style="font-size:12.5px;color:var(--accentDark);cursor:pointer">Mot de passe oublié ?</a></div>':""}
     <div id="authErr" style="color:#B4453A;font-size:13px;min-height:18px;margin-top:8px"></div>
     <div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--border)"></div><span class="muted">ou</span><div style="flex:1;height:1px;background:var(--border)"></div></div>

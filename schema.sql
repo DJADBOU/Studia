@@ -3,6 +3,15 @@
 -- Script idempotent : peut être ré-exécuté sans risque.
 -- ============================================================
 
+-- 0) Fonction is_admin() — vrai si l'utilisateur connecté est admin.
+--    Définie ici pour que le script soit auto-suffisant (les emails
+--    correspondent aux fondateurs). Si tu gères les admins via une table,
+--    remplace simplement le corps par un select sur cette table.
+create or replace function is_admin() returns boolean
+  language sql stable security definer set search_path = public, auth as $$
+  select coalesce(auth.jwt() ->> 'email','') in ('djad@studia.app','ellis@studia.app');
+$$;
+
 -- 1) Abonnés (rempli par le webhook Stripe, via la clé service_role)
 create table if not exists subscribers (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -222,6 +231,70 @@ drop policy if exists "comments_self_delete" on comments;
 create policy "comments_self_delete" on comments
   for delete to authenticated using (user_id = auth.uid() or auth.jwt() ->> 'email' = 'djad@studia.app');
 
+-- 10) Favoris / bookmarks
+create table if not exists bookmarks (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  contenu_id text not null,
+  created_at timestamptz default now(),
+  primary key (user_id, contenu_id)
+);
+alter table bookmarks enable row level security;
+drop policy if exists "bookmarks_self_all" on bookmarks;
+create policy "bookmarks_self_all" on bookmarks
+  for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- 11) Notes personnelles
+create table if not exists notes (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  contenu_id text not null,
+  texte text not null default '',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+create index if not exists notes_user_contenu_idx on notes(user_id, contenu_id);
+alter table notes enable row level security;
+drop policy if exists "notes_self_all" on notes;
+create policy "notes_self_all" on notes
+  for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- 12) Candidatures tuteurs
+create table if not exists tutor_applications (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  prenom text, nom text, email text, phone text,
+  univ text, faculte text, annee text, matiere text, note text,
+  message text,
+  status text default 'pending', -- 'pending' | 'accepted' | 'rejected'
+  created_at timestamptz default now()
+);
+alter table tutor_applications enable row level security;
+drop policy if exists "tutor_apps_self_insert" on tutor_applications;
+create policy "tutor_apps_self_insert" on tutor_applications
+  for insert to authenticated with check (user_id = auth.uid());
+drop policy if exists "tutor_apps_self_read" on tutor_applications;
+create policy "tutor_apps_self_read" on tutor_applications
+  for select to authenticated using (user_id = auth.uid() or is_admin());
+drop policy if exists "tutor_apps_admin_update" on tutor_applications;
+create policy "tutor_apps_admin_update" on tutor_applications
+  for update to authenticated using (is_admin()) with check (is_admin());
+-- l'admin (ou l'auteur) peut supprimer une candidature traitée
+drop policy if exists "tutor_apps_delete" on tutor_applications;
+create policy "tutor_apps_delete" on tutor_applications
+  for delete to authenticated using (user_id = auth.uid() or is_admin());
+
+-- Realtime : le candidat doit voir son statut changer en direct quand l'admin
+-- accepte/rejette. On ajoute la table à la publication supabase_realtime (idempotent).
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'tutor_applications'
+  ) then
+    alter publication supabase_realtime add table tutor_applications;
+  end if;
+end $$;
+
 -- Storage policies pour "sujets" : bucket privé, seul l'admin upload/lit
 -- (l'edge function "download" utilise la clé service_role qui bypass la RLS)
 -- Pour permettre l'affichage inline aux abonnés, on autorise les select aux users actifs :
@@ -250,3 +323,166 @@ drop policy if exists "sujets_admin_delete" on storage.objects;
 create policy "sujets_admin_delete" on storage.objects
   for delete to authenticated
   using (bucket_id = 'sujets' and auth.jwt() ->> 'email' = 'djad@studia.app');
+
+-- 13) Signalements d'erreurs (feedback par sujet)
+--     Un abonné/étudiant signale une faute, un lien cassé, une mauvaise réponse…
+create table if not exists signalements (
+  id bigserial primary key,
+  contenu_id text not null,
+  user_id uuid references auth.users(id) on delete set null,
+  email text,
+  message text not null,
+  status text default 'pending',          -- 'pending' | 'resolved'
+  created_at timestamptz default now()
+);
+create index if not exists signalements_contenu_idx on signalements(contenu_id);
+create index if not exists signalements_status_idx on signalements(status);
+alter table signalements enable row level security;
+
+-- l'étudiant connecté insère son propre signalement
+drop policy if exists "signalements_self_insert" on signalements;
+create policy "signalements_self_insert" on signalements
+  for insert to authenticated with check (user_id = auth.uid());
+
+-- l'étudiant voit ses propres signalements, l'admin voit tout
+drop policy if exists "signalements_read" on signalements;
+create policy "signalements_read" on signalements
+  for select to authenticated using (user_id = auth.uid() or is_admin());
+
+-- seul l'admin met à jour le statut (traité / rouvert)
+drop policy if exists "signalements_admin_update" on signalements;
+create policy "signalements_admin_update" on signalements
+  for update to authenticated using (is_admin()) with check (is_admin());
+
+-- l'admin (ou l'auteur) peut supprimer
+drop policy if exists "signalements_delete" on signalements;
+create policy "signalements_delete" on signalements
+  for delete to authenticated using (user_id = auth.uid() or is_admin());
+
+-- 14) Contributions entraide (documents proposés par les étudiants)
+--     Flux : l'étudiant propose un doc original → file d'attente admin →
+--     l'admin télécharge le PDF → le ré-upload normalement via le pipeline existant.
+--     RIEN n'est publié automatiquement.
+create table if not exists contributions (
+  id bigserial primary key,
+  user_id uuid references auth.users(id) on delete set null,
+  email text,
+  univ text, faculte text, annee text, matiere text, type text,
+  titre text not null,
+  description text,
+  file_path text not null,                 -- chemin dans le bucket privé "contributions"
+  file_name text,
+  status text default 'pending',           -- 'pending' | 'processed' | 'rejected'
+  created_at timestamptz default now()
+);
+create index if not exists contributions_status_idx on contributions(status);
+alter table contributions enable row level security;
+
+-- l'étudiant connecté insère sa propre proposition
+drop policy if exists "contributions_self_insert" on contributions;
+create policy "contributions_self_insert" on contributions
+  for insert to authenticated with check (user_id = auth.uid());
+
+-- l'étudiant voit ses propres propositions, l'admin voit tout
+drop policy if exists "contributions_read" on contributions;
+create policy "contributions_read" on contributions
+  for select to authenticated using (user_id = auth.uid() or is_admin());
+
+-- seul l'admin change le statut (traité / rejeté / en attente)
+drop policy if exists "contributions_admin_update" on contributions;
+create policy "contributions_admin_update" on contributions
+  for update to authenticated using (is_admin()) with check (is_admin());
+
+-- l'admin (ou l'auteur) peut supprimer
+drop policy if exists "contributions_delete" on contributions;
+create policy "contributions_delete" on contributions
+  for delete to authenticated using (user_id = auth.uid() or is_admin());
+
+-- 15) Storage : bucket PRIVÉ "contributions" — à créer dans Supabase → Storage → New bucket
+--     (décocher "Public"). Reçoit les fichiers bruts proposés par les étudiants.
+--     L'admin les télécharge via un signed URL, vérifie, puis ré-upload dans "sujets".
+
+-- l'étudiant connecté upload UNIQUEMENT dans son propre dossier (user_id/...)
+drop policy if exists "contributions_user_upload" on storage.objects;
+create policy "contributions_user_upload" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'contributions'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- l'étudiant relit ses propres fichiers ; l'admin lit tout (pour le signed URL)
+drop policy if exists "contributions_user_select" on storage.objects;
+create policy "contributions_user_select" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'contributions'
+    and ((storage.foldername(name))[1] = auth.uid()::text or is_admin())
+  );
+
+-- l'admin peut supprimer un fichier de proposition
+drop policy if exists "contributions_admin_delete" on storage.objects;
+create policy "contributions_admin_delete" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'contributions' and is_admin());
+
+
+-- ============================================================================
+-- 11) PROFILS ENRICHIS + DOCUMENTS PERSO (CV / relevé de notes)
+--     À exécuter tel quel : idempotent (add column if not exists / drop+create).
+-- ============================================================================
+
+-- 11.a) Nouvelles colonnes de profil
+alter table profiles add column if not exists phone       text;
+alter table profiles add column if not exists birthdate   date;     -- on calcule l'âge à l'affichage
+alter table profiles add column if not exists genre       text;     -- 'Homme' | 'Femme' | 'Autre' | 'Non précisé'
+alter table profiles add column if not exists ville       text;
+alter table profiles add column if not exists adresse     text;
+alter table profiles add column if not exists semestre    text default 'S1';  -- S1 | S2 (semestre d'inscription)
+alter table profiles add column if not exists linkedin    text;     -- URL (optionnel)
+alter table profiles add column if not exists cv_path     text;     -- chemin storage bucket 'documents' (optionnel)
+alter table profiles add column if not exists releve_path text;     -- chemin storage bucket 'documents' (optionnel)
+
+-- 11.b) Bucket PRIVÉ 'documents' : CV + relevés de notes des étudiants.
+--       Ne JAMAIS le rendre public (données personnelles).
+insert into storage.buckets (id, name, public)
+values ('documents', 'documents', false)
+on conflict (id) do nothing;
+
+-- l'étudiant upload uniquement dans son propre dossier (user_id/...)
+drop policy if exists "documents_user_upload" on storage.objects;
+create policy "documents_user_upload" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'documents'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- l'étudiant remplace/efface son fichier ; l'admin gère tout
+drop policy if exists "documents_user_update" on storage.objects;
+create policy "documents_user_update" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'documents'
+    and ((storage.foldername(name))[1] = auth.uid()::text or is_admin())
+  );
+
+drop policy if exists "documents_user_delete" on storage.objects;
+create policy "documents_user_delete" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'documents'
+    and ((storage.foldername(name))[1] = auth.uid()::text or is_admin())
+  );
+
+-- l'étudiant relit ses propres fichiers ; l'admin lit tout (signed URL)
+drop policy if exists "documents_user_select" on storage.objects;
+create policy "documents_user_select" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'documents'
+    and ((storage.foldername(name))[1] = auth.uid()::text or is_admin())
+  );
+
+-- Recharge le cache de schéma PostgREST (sinon erreurs PGRST204 sur les nouvelles colonnes)
+notify pgrst, 'reload schema';
