@@ -87,6 +87,46 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .bookmark-btn{background:none;border:none;cursor:pointer;font-size:18px;color:var(--muted);padding:4px 8px;transition:transform .15s,color .15s}
 .bookmark-btn:hover{transform:scale(1.15)}
 .bookmark-btn.on{color:#F5A623}
+/* ===== Matières & contenus (redesign cartes) ===== */
+.mat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:16px}
+.matiere-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px 20px 18px 24px;overflow:hidden;cursor:pointer;transition:transform .2s cubic-bezier(.2,.7,.2,1),box-shadow .2s,border-color .2s}
+.matiere-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,var(--accent),var(--accentDark));opacity:.9}
+.matiere-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 14px 30px rgba(30,140,60,.12)}
+.matiere-card:active{transform:translateY(-1px);transition:transform .05s}
+.matiere-card .mc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px}
+.matiere-card h3{font-size:16.5px;color:var(--ink);font-weight:600;margin:0;line-height:1.32}
+.matiere-card .mc-total{flex-shrink:0;font-size:11.5px;font-weight:600;color:var(--accentDark);background:var(--accentSoft);padding:4px 10px;border-radius:20px;white-space:nowrap}
+.matiere-card .mc-chips{display:flex;gap:6px;flex-wrap:wrap}
+.mc-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--sub);background:var(--bg);border:1px solid var(--border);padding:4px 9px;border-radius:8px}
+.mc-chip.zero{opacity:.42}
+.mc-chip b{font-weight:600;color:var(--text)}
+.content-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:16px}
+.content-card{position:relative;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .2s cubic-bezier(.2,.7,.2,1),box-shadow .2s,border-color .2s}
+.content-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 28px rgba(30,140,60,.10)}
+.content-card:active{transform:translateY(-1px);transition:transform .05s}
+.cc-cover{position:relative;height:126px;display:flex;align-items:center;justify-content:center;font-size:38px;overflow:hidden}
+.cc-cover img{width:100%;height:100%;object-fit:cover;display:block}
+.cc-play{position:absolute;width:46px;height:46px;border-radius:50%;background:rgba(20,20,18,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;padding-left:3px}
+.cc-lock{position:absolute;inset:0;background:rgba(26,26,24,.32);display:flex;align-items:center;justify-content:center;font-size:25px}
+.cc-badges{position:absolute;top:10px;left:10px;display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 54px);z-index:1}
+.cc-star{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.94);border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:15px;color:var(--muted);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 7px rgba(0,0,0,.14);transition:transform .15s,color .15s;z-index:2}
+.cc-star:hover{transform:scale(1.12)}
+.cc-star.on{color:#F5A623}
+.cc-body{padding:13px 14px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
+.cc-type{font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--accentDark)}
+.cc-title{font-size:14.5px;color:var(--ink);font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cc-meta{font-size:12.5px;color:var(--sub);margin-top:auto;padding-top:2px;line-height:1.4}
+.cc-pill{font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.cc-pill.free{background:var(--accentSoft);color:var(--accentDark)}
+.cc-pill.video{background:rgba(20,20,18,.66);color:#fff}
+.cc-pill.new{background:var(--amberSoft);color:var(--amber)}
+.legal-note{margin-top:34px;background:#FBFBFA;border:1px solid var(--border);border-left:3px solid var(--borderStrong);border-radius:12px;padding:16px 18px}
+.legal-note .ln-h{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);margin-bottom:7px}
+.legal-note p{margin:0;font-size:12.8px;line-height:1.62;color:var(--sub)}
+.legal-note .ln-links{margin-top:11px;display:flex;gap:8px;flex-wrap:wrap;font-size:12px}
+.legal-note .ln-links a{color:var(--accentDark);text-decoration:none;border:1px solid var(--border);background:var(--surface);padding:4px 10px;border-radius:7px;transition:border-color .15s,background .15s;white-space:nowrap}
+.legal-note .ln-links a:hover{border-color:var(--accent);background:var(--accentSoft)}
+@media(max-width:560px){.content-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}.cc-cover{height:100px;font-size:30px}.cc-title{font-size:13.5px}.mat-grid{grid-template-columns:1fr}}
 .notes-panel{margin-top:24px;background:#FBFBF5;border:1px solid #EAE6D4;border-radius:14px;padding:18px 20px}
 .notes-panel textarea{width:100%;border:0;background:transparent;font-size:14.5px;font-family:inherit;line-height:1.5;outline:none;resize:vertical;min-height:80px;color:var(--text)}
 .onboarding-overlay{position:fixed;inset:0;z-index:300;background:rgba(26,26,24,.6);display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeUp .3s ease}
@@ -347,6 +387,26 @@ function setupRealtime(){
         }
       })
       .on("postgres_changes",{event:"*",schema:"public",table:"categories"},()=>{loadCategories();})
+      .on("postgres_changes",{event:"*",schema:"public",table:"tutor_applications"},payload=>{
+        const ev=payload.eventType;
+        // Côté admin : on tient la liste à jour en direct
+        if(state._apps){
+          if(ev==="INSERT"){if(!state._apps.find(a=>a.id===payload.new.id))state._apps.unshift(payload.new);}
+          else if(ev==="UPDATE"){const i=state._apps.findIndex(a=>a.id===payload.new.id);if(i>=0)state._apps[i]={...state._apps[i],...payload.new};}
+          else if(ev==="DELETE"){state._apps=state._apps.filter(a=>a.id!==payload.old.id);}
+        }
+        // Côté candidat : sa propre candidature change → statut live + notif
+        if(state._myApp&&payload.new&&payload.new.id===state._myApp.id){
+          const prev=state._myApp.status;
+          state._myApp={...state._myApp,...payload.new};
+          if(ev==="UPDATE"&&payload.new.status!==prev){
+            if(payload.new.status==="accepted")toast("🎉 Ta candidature tuteur a été ACCEPTÉE ! Va voir « Devenir tuteur ».","ok",7000);
+            else if(payload.new.status==="rejected")toast("Ta candidature tuteur n'a pas été retenue cette fois.","warn",6000);
+          }
+        }
+        if(state._myApp&&ev==="DELETE"&&payload.old&&payload.old.id===state._myApp.id){state._myApp=null;state._reapply=false;}
+        safeRender();
+      })
       .subscribe();
   }catch(e){console.warn("Realtime:",e.message);}
 }
@@ -480,7 +540,7 @@ async function dbDeleteCategory(id){
   try{const{error}=await sb.from("categories").delete().eq("id",id);if(error){toast(error.message,"err");return;}toast("Catégorie supprimée","ok");}catch(e){}
 }
 function defaultIconFor(id){const ic={cours:"📘",td:"▶",midterm:"🗒",examen:"📝",partiel:"📋",methode:"💡",annale:"📂"};return ic[(id||"").toLowerCase()]||"📄";}
-async function restoreSession(){if(!sb)return;try{await loadAdmins();const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=isAdminEmail(data.user.email);state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;showDbStatus(true);render();await checkSubscription();await loadProfile();await loadBookmarks();render();maybeShowOnboarding();}}catch(e){}}
+async function restoreSession(){if(!sb)return;try{await loadAdmins();const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=isAdminEmail(data.user.email);state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;showDbStatus(true);render();await checkSubscription();await loadProfile();await loadBookmarks();if(!isAdmin)loadMyApplication();render();maybeShowOnboarding();}}catch(e){}}
 async function loadHiddenMatieres(){if(!sb)return;try{const{data,error}=await sb.from("matieres_hidden").select("*");if(!error&&data){state.hiddenMatieres=new Set(data.map(r=>`${r.univ}|${r.faculte}|${r.annee}|${r.matiere}`));}}catch(e){}}
 async function dbHideMatiere(univ,faculte,annee,matiere){if(!sb)return false;try{const{error}=await sb.from("matieres_hidden").insert({univ,faculte,annee,matiere});if(error){toast("Échec : "+error.message,"err");return false;}toast("Matière masquée","ok");return true;}catch(e){toast("Erreur","err");return false;}}
 function goCheckout(plan){const link=plan==="semestre"?CONFIG.STRIPE_LINK_SEMESTRE:CONFIG.STRIPE_LINK_MENSUEL;if(link){window.location.href=link;}else{state.modal=true;renderModal();}}
@@ -702,7 +762,7 @@ function renderContribute(){
   const sel="width:100%;padding:9px 10px;font-size:13.5px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text)";
   r.innerHTML=`<div class="modal-bg" onclick="closeContribute()"><div class="modal fade" onclick="event.stopPropagation()" style="max-width:520px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 class="serif" style="font-size:22px;color:var(--ink);margin:0">Proposer un document</h3><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px" onclick="closeContribute()">✕</button></div>
-    <p class="muted" style="margin:0 0 16px;font-size:13px;line-height:1.5">Partage un cours, une fiche ou un corrigé <b>original</b> (le tien). L'équipe le vérifie avant publication — il ne sera pas visible immédiatement. ⚠️ Ne propose jamais le support d'un prof : seul le contenu original te protège juridiquement.</p>
+    <p class="muted" style="margin:0 0 16px;font-size:13px;line-height:1.5">Partage <b>n'importe quel document utile en rapport avec ta fac</b> : cours, fiches, corrigés, mais aussi <b>examens finaux officiels, sujets d'examen, TD officiels</b>, annales… L'équipe vérifie chaque document avant publication — il ne sera pas visible immédiatement.</p>
     <div style="display:grid;gap:10px">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
         <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Université</label>
@@ -789,18 +849,49 @@ function AdminContributionsView(){
 }
 async function downloadContribution(path){
   if(!sb)return;
-  try{const{data,error}=await sb.storage.from("contributions").createSignedUrl(path,3600);
-    if(error||!data){toast("Téléchargement impossible : "+((error&&error.message)||""),"err",4000);return;}
-    window.open(data.signedUrl,"_blank");
-  }catch(e){toast("Erreur : "+e.message,"err");}
+  const c=(state._contributions||[]).find(x=>x.file_path===path);
+  const filename=(c&&c.file_name)||(path.split("/").pop());
+  toast("⬇ Préparation du téléchargement…","ok",1500);
+  try{
+    // download:filename => le lien force un vrai téléchargement (Content-Disposition: attachment),
+    // donc pas de pop-up bloqué et le fichier descend directement.
+    const{data,error}=await sb.storage.from("contributions").createSignedUrl(path,3600,{download:filename||true});
+    if(error||!data){toast("Téléchargement impossible : "+((error&&error.message)||"fichier introuvable"),"err",4500);return;}
+    const a=document.createElement("a");
+    a.href=data.signedUrl;a.download=filename||"";a.rel="noopener";a.style.display="none";
+    document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),0);
+  }catch(e){toast("Erreur : "+e.message,"err",4000);}
 }
 async function updateContribution(id,status){
   if(!sb)return;
-  try{await sb.from("contributions").update({status}).eq("id",id);loadContributions();}catch(e){toast("Erreur","err");}
+  const list=state._contributions||[];
+  const idx=list.findIndex(c=>c.id===id);
+  const prev=idx>=0?list[idx].status:undefined;
+  if(idx>=0){list[idx]={...list[idx],status};render();} // optimiste
+  const lbl=status==="processed"?"Traité":status==="rejected"?"Rejeté":"En attente";
+  try{
+    const{error}=await sb.from("contributions").update({status}).eq("id",id);
+    if(error)throw error;
+    toast("✓ "+lbl,"ok",1800);
+  }catch(e){
+    if(idx>=0){list[idx]={...list[idx],status:prev};render();} // rollback
+    toast("Échec de la mise à jour : "+(e.message||"erreur"),"err",4500);
+  }
 }
 async function deleteContribution(id,path){
-  if(!sb)return;if(!confirm("Supprimer cette proposition et son fichier ?"))return;
-  try{if(path)await sb.storage.from("contributions").remove([path]);await sb.from("contributions").delete().eq("id",id);state._contributions=(state._contributions||[]).filter(c=>c.id!==id);render();}catch(e){toast("Erreur","err");}
+  if(!sb)return;if(!confirm("Supprimer définitivement cette proposition et son fichier ?"))return;
+  const before=state._contributions||[];
+  const removed=before.find(c=>c.id===id);
+  state._contributions=before.filter(c=>c.id!==id);render(); // optimiste
+  try{
+    const{error}=await sb.from("contributions").delete().eq("id",id);
+    if(error)throw error;
+    if(path){try{await sb.storage.from("contributions").remove([path]);}catch(_){/* fichier déjà absent : non bloquant */}}
+    toast("🗑 Proposition supprimée","ok",1800);
+  }catch(e){
+    if(removed){state._contributions=before;render();} // rollback
+    toast("Suppression impossible : "+(e.message||"erreur"),"err",4500);
+  }
 }
 
 /* ===== PDF per-user watermark ===== */
@@ -1157,7 +1248,7 @@ function selectUniv(id){
 }
 function selectFaculte(fid){const f=facById(state.univ.id,fid);if(!f)return;state.faculte=f;state.annee="L1";state.view="programme";render();}
 function pickAnnee(a){state.annee=a;render();}
-function openMatiere(idx){const m=matieresFor(state.univ.id,state.faculte.id,state.annee)[idx];if(m==null)return;state.matiere=m;state.tab=(allCategories()[0]||{id:"Cours"}).id;state.view="matiere";render();}
+function openMatiere(m){if(m==null||m==="")return;state.matiere=m;state.tab=(allCategories()[0]||{id:"Cours"}).id;state.view="matiere";render();}
 function setTab(t){state.tab=t;render();}
 async function openItem(id){
   const c=state.contenus.find(x=>x.id===id);if(!c)return;
@@ -1245,7 +1336,7 @@ async function doAuth(){
   loginStudent(email);
 }
 async function googleAuth(){if(sb){try{await sb.auth.signInWithOAuth({provider:"google"});}catch(e){}}else{loginStudent("etudiant@exemple.fr");}}
-function logout(){if(sb){try{sb.auth.signOut();}catch(e){}}state.user=null;state.adminAuthed=false;state.subscribed=false;state.menu=false;state.view="landing";showDbStatus(false);render();}
+function logout(){if(sb){try{sb.auth.signOut();}catch(e){}}state.user=null;state.adminAuthed=false;state.subscribed=false;state.menu=false;state.view="landing";state._myApp=undefined;state.tutorApplied=false;state._reapply=false;state._apps=null;showDbStatus(false);render();}
 
 /* ===== RENDER ===== */
 function render(){
@@ -1562,22 +1653,25 @@ function MyCoursesView(){
       </div>
     </div>
 
-    ${mats.length?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));margin-bottom:36px">
-      ${mats.map((m,i)=>{const cats=allCategories();const counts=cats.map(c=>({c,n:countMat(p.univ,p.faculte,annee,m,c.id,sem)}));const total=counts.reduce((s,x)=>s+x.n,0);return `<div class="card card-h" style="padding:20px" onclick="goMatiereStudent('${esc(m).replace(/'/g,"\\'")}')">
-        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0;padding-right:8px;line-height:1.3">${esc(m)}</h3><span style="color:var(--muted)">›</span></div>
-        <div style="display:flex;gap:8px;font-size:12px;color:var(--sub);flex-wrap:wrap">${counts.map(({c,n})=>`<span>${c.icon} ${n}</span>`).join("")}</div>
-        ${total===0?'<div class="muted" style="margin-top:8px;font-size:11.5px;font-style:italic">À venir</div>':""}
+    ${mats.length?`<div class="mat-grid" style="margin-bottom:36px">
+      ${mats.map(m=>{const cats=allCategories();const counts=cats.map(c=>({c,n:countMat(p.univ,p.faculte,annee,m,c.id,sem)}));const total=counts.reduce((s,x)=>s+x.n,0);return `<div class="matiere-card" onclick="goMatiereStudent('${esc(m).replace(/'/g,"\\'")}')">
+        <div class="mc-top"><h3>${esc(m)}</h3><span class="mc-total">${total?total+" doc"+(total>1?"s":""):"À venir"}</span></div>
+        <div class="mc-chips">${counts.map(({c,n})=>`<span class="mc-chip ${n?"":"zero"}" title="${esc(c.label)}">${c.icon} <b>${n}</b></span>`).join("")}</div>
       </div>`;}).join("")}
     </div>`:`<div class="card" style="padding:48px;text-align:center;color:var(--muted);margin-bottom:36px">Aucune matière publiée en ${annee} pour ${esc(f.nom)} pour l'instant. Reviens bientôt — l'équipe Studia ajoute du contenu chaque semaine.</div>`}
 
     ${recentUploads.length?`<div style="margin-bottom:32px">
       <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 14px">Dernières nouveautés ${annee}</h2>
-      <div style="display:grid;gap:10px">
-        ${recentUploads.map(it=>{const locked=!it.gratuit&&!state.subscribed;return `<div class="card card-h row" onclick="openItemFromMyCourses('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":smartIcon(it)}</div><div style="flex:1;min-width:0"><div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span class="tag">${labelFor(it.type)}</span><span class="tag">${esc(it.matiere||"")}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}</div><div style="font-size:15px;color:var(--ink);font-weight:500">${esc(it.titre||"")}</div><div class="muted">★ ${esc(it.tuteur||"—")} · ${esc(it.note||"—")}/20${it.duree?" · "+esc(it.duree):""}</div></div><span style="color:var(--muted)">›</span></div>`;}).join("")}
-      </div>
+      <div class="content-grid">${recentUploads.map(it=>contentCardHTML(it,"openItemFromMyCourses",it.matiere)).join("")}</div>
     </div>`:""}
 
-    ${gratuit.length&&!state.subscribed?`<div class="card" style="padding:24px 26px;background:var(--ink);color:#fff;border:none">
+    ${gratuit.length&&!state.subscribed?`<div style="margin-bottom:28px">
+      <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 6px">Aperçu gratuit ${annee}</h2>
+      <p style="font-size:14px;color:var(--sub);margin:0 0 14px">Quelques contenus en accès libre pour te faire une idée.</p>
+      <div class="content-grid">${gratuit.map(it=>contentCardHTML(it,"openItemFromMyCourses",it.matiere)).join("")}</div>
+    </div>`:""}
+
+    ${!state.subscribed?`<div class="card" style="padding:24px 26px;background:var(--ink);color:#fff;border:none">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px">
         <div><div class="serif" style="font-size:22px;color:#fff;margin-bottom:4px">Débloque tout le programme.</div><p style="color:rgba(255,255,255,.7);margin:0;font-size:14.5px">Pass semestriel à 39 € — accès illimité jusqu'à la fin du semestre.</p></div>
         <button class="btn btn-accent" onclick="setModal(true)">S'abonner</button>
@@ -1613,11 +1707,11 @@ function Programme(){
       <div class="seg">${["L1","L2","L3"].map(y=>`<button class="${a===y?"on":""}" onclick="pickAnnee('${y}')">${y}</button>`).join("")}</div>
       <div class="seg">${["S1","S2"].map(s=>`<button class="${sem===s?"on":""}" onclick="state.semestre='${s}';render()">${s}</button>`).join("")}</div>
     </div>
-    ${mats.length?`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">
-      ${mats.map((m,i)=>`<div class="card card-h" style="padding:20px" onclick="openMatiere(${i})">
-        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:14px"><h3 style="font-size:17px;color:var(--ink);font-weight:600;margin:0;max-width:200px">${m}</h3><span style="color:var(--muted)">›</span></div>
-        <div style="display:flex;gap:10px;font-size:12.5px;color:var(--sub);flex-wrap:wrap">${allCategories().map(c=>`<span>${c.icon} ${countMat(uid,fid,a,m,c.id,sem)}</span>`).join("")}</div>
-      </div>`).join("")}
+    ${mats.length?`<div class="mat-grid">
+      ${mats.map(m=>{const counts=allCategories().map(c=>({c,n:countMat(uid,fid,a,m,c.id,sem)}));const total=counts.reduce((s,x)=>s+x.n,0);return `<div class="matiere-card" onclick="openMatiere('${esc(m).replace(/'/g,"\\'")}')">
+        <div class="mc-top"><h3>${esc(m)}</h3><span class="mc-total">${total} doc${total>1?"s":""}</span></div>
+        <div class="mc-chips">${counts.map(({c,n})=>`<span class="mc-chip ${n?"":"zero"}" title="${esc(c.label)}">${c.icon} <b>${n}</b></span>`).join("")}</div>
+      </div>`;}).join("")}
     </div>`:`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucune matière en ${a} · ${sem}.</div>`}
   </div>`;
 }
@@ -1631,15 +1725,71 @@ function MatiereView(){
     <button class="btn btn-ghost btn-sm" style="border:none;padding:0;color:var(--sub);margin-bottom:16px" onclick="nav('programme')">← ${state.faculte.nom} · ${annee} · ${sem}</button>
     <h1 class="serif" style="font-size:38px;color:var(--ink);margin:0 0 20px">${matiere}</h1>
     <div class="tabs">${cats.map(c=>`<button class="${tab===c.id?"on":""}" onclick="setTab('${c.id}')">${esc(c.label)} <span style="color:var(--muted);font-weight:400">${countMat(uid,fid,annee,matiere,c.id,sem)}</span></button>`).join("")}</div>
-    <div style="max-width:760px">${items.length?items.map(it=>{
-      const locked=!it.gratuit&&!state.subscribed&&!isAdminUser();
-      const bookmarked=state.bookmarks.has(it.id);
-      return `<div class="card card-h row" onclick="openItem('${it.id}')"><div class="ic ${locked?"lock":""}">${locked?"🔒":smartIcon(it)}</div>
-        <div style="flex:1;min-width:0"><div style="display:flex;gap:8px;margin-bottom:5px;flex-wrap:wrap"><span class="tag">${labelFor(it.type)}</span>${it.gratuit?'<span class="pill">Gratuit</span>':""}${it.source==="upload"?'<span class="tag amber">Nouveau</span>':""}${it.video_url?'<span class="pill">▶ Vidéo</span>':""}</div>
-        <div style="font-size:15px;color:var(--ink);font-weight:500;margin-bottom:3px">${it.titre}</div><div class="muted">★ ${it.tuteur} · ${it.note}/20${it.duree?" · "+it.duree:""}</div></div>
-        <button class="bookmark-btn ${bookmarked?"on":""}" onclick="event.stopPropagation();toggleBookmark('${it.id}')" title="${bookmarked?"Retirer des favoris":"Ajouter aux favoris"}">${bookmarked?"★":"☆"}</button>
-        <span style="color:var(--muted)">›</span></div>`;
-    }).join(""):`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucun contenu ici pour l'instant.</div>`}</div>
+    ${items.length?`<div class="content-grid">${items.map(it=>contentCardHTML(it)).join("")}</div>`:`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucun contenu ici pour l'instant.</div>`}
+    ${legalNoteHTML()}
+  </div>`;
+}
+/* Carte de contenu (preview vidéo / icône type, badges, favori) */
+function typeGradient(type){
+  const map={
+    Cours:"linear-gradient(135deg,#E7F8EC,#C6EDD3)",
+    TD:"linear-gradient(135deg,#E9F0FE,#CBDDF9)",
+    Midterm:"linear-gradient(135deg,#FBF1E0,#F2DEBC)",
+    Examen:"linear-gradient(135deg,#F6E9F3,#E6C9DF)"
+  };
+  return map[type]||"linear-gradient(135deg,#F2F1EE,#E1E0DB)";
+}
+function contentCardHTML(it,opener,extraTag){
+  opener=opener||"openItem";
+  const locked=!it.gratuit&&!state.subscribed&&!isAdminUser();
+  const bookmarked=state.bookmarks.has(it.id);
+  const v=parseVideoEmbed(it.video_url,false);
+  const thumb=v&&v.thumb;
+  const grad=typeGradient(it.type);
+  let cover;
+  if(thumb){
+    cover=`<div class="cc-cover" style="background:${grad}"><img src="${thumb}" alt="" loading="lazy" onerror="this.remove()">${locked?'<div class="cc-lock">🔒</div>':'<div class="cc-play">▶</div>'}</div>`;
+  }else{
+    const inner=locked?'<div class="cc-lock">🔒</div>':(v?'<div class="cc-play">▶</div>':`<span>${smartIcon(it)}</span>`);
+    cover=`<div class="cc-cover" style="background:${grad}">${inner}</div>`;
+  }
+  const badges=[
+    it.gratuit?'<span class="cc-pill free">Gratuit</span>':"",
+    it.video_url?'<span class="cc-pill video">▶ Vidéo</span>':"",
+    it.source==="upload"?'<span class="cc-pill new">Nouveau</span>':""
+  ].filter(Boolean).join("");
+  const sub=extraTag?esc(extraTag):esc(it.tuteur||"");
+  const subOk=sub&&sub!=="—"&&sub!=="-";
+  const noteStr=it.note!=null?String(it.note).trim():"";
+  const noteOk=noteStr!==""&&noteStr!=="—"&&noteStr!=="-";
+  const metaParts=[];
+  if(subOk)metaParts.push(`★ ${sub}`);
+  if(noteOk)metaParts.push(`${esc(noteStr)}/20`);
+  if(it.duree)metaParts.push(esc(it.duree));
+  return `<div class="content-card" onclick="${opener}('${it.id}')">
+    ${cover}
+    ${badges?`<div class="cc-badges">${badges}</div>`:""}
+    <button class="cc-star ${bookmarked?"on":""}" onclick="event.stopPropagation();toggleBookmark('${it.id}')" title="${bookmarked?"Retirer des favoris":"Ajouter aux favoris"}">${bookmarked?"★":"☆"}</button>
+    <div class="cc-body">
+      <span class="cc-type">${esc(labelFor(it.type))}</span>
+      <div class="cc-title">${esc(it.titre||"")}</div>
+      ${metaParts.length?`<div class="cc-meta">${metaParts.join(" · ")}</div>`:""}
+    </div>
+  </div>`;
+}
+/* Mention légale (propriété intellectuelle) affichée sur chaque matière */
+function legalNoteHTML(){
+  const L122_4="https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000006278911";
+  const L122_5="https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000048603495";
+  const L335_2="https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000032655082";
+  return `<div class="legal-note">
+    <div class="ln-h">⚖️ Propriété intellectuelle &amp; légalité</div>
+    <p>Les sujets <b>officiels</b> des établissements (examens finaux, midterms, partiels, TD corrigés) sont protégés par le droit d'auteur : Studia <b>ne les reproduit pas et ne les rediffuse pas</b>. Les contenus proposés ici sont des <b>productions originales</b> rédigées par nos tuteurs, qui reprennent le <b>format, le niveau et les thématiques</b> des épreuves réelles — pour t'entraîner comme sur les vrais sujets, dans le strict respect de la loi.</p>
+    <div class="ln-links">
+      <a href="${L122_4}" target="_blank" rel="noopener noreferrer">Art. L122-4 CPI · reproduction</a>
+      <a href="${L122_5}" target="_blank" rel="noopener noreferrer">Art. L122-5 CPI · exceptions &amp; citation</a>
+      <a href="${L335_2}" target="_blank" rel="noopener noreferrer">Art. L335-2 CPI · contrefaçon</a>
+    </div>
   </div>`;
 }
 /* ===== Detail ===== */
@@ -1798,8 +1948,27 @@ function Tuteur(){
   const p=state.profile||{};
   const tf=state._taForm||{};
   const u=univById(p.univ||state._taUniv||"uca");
-  if(state.tutorApplied){
-    return `<div class="wrap fade" style="padding:54px 0;max-width:600px;text-align:center"><div class="card" style="padding:48px 32px"><div style="font-size:50px;margin-bottom:14px">✅</div><h1 class="serif" style="font-size:30px;color:var(--ink);margin:0 0 12px">Candidature reçue !</h1><p style="color:var(--sub);font-size:15px;line-height:1.6;margin:0">L'équipe Studia te répond sous 48h par email. En attendant, prépare un exemple de correction sur une feuille A4 — c'est ce qu'on te demandera ensuite.</p><button class="btn btn-ghost" style="margin-top:24px" onclick="nav('landing')">Retour à l'accueil</button></div></div>`;
+  // Si l'utilisateur connecté a déjà une candidature → on montre son statut (live), pas le formulaire
+  if(state.user&&!isAdminUser()&&state._myApp===undefined){loadMyApplication();}
+  const myApp=state._myApp;
+  if(state.user&&myApp&&!state._reapply){
+    const st=myApp.status||"pending";
+    const conf=st==="accepted"
+      ?{emo:"✅",bg:"#E7F8EC",bd:"#1E8C3C",ti:"Candidature acceptée 🎉",tx:"Bravo ! L'équipe Studia va te contacter par email pour la suite (correction-test). Garde un œil sur ta boîte mail."}
+      :st==="rejected"
+      ?{emo:"✕",bg:"#FBEDEC",bd:"#B4453A",ti:"Candidature non retenue",tx:"Pas cette fois — mais tu peux retenter avec une autre matière où tu as vraiment cartonné."}
+      :{emo:"🕓",bg:"#FFF3D9",bd:"#9A6A18",ti:"Candidature en cours d'examen",tx:"On l'a bien reçue ! L'équipe la traite. Tu n'as rien à faire — ce statut se met à jour ici tout seul, en temps réel. Réponse sous 48h."};
+    return `<div class="wrap fade" style="padding:54px 0;max-width:600px"><div class="card" style="padding:40px 32px;text-align:center;border-color:${conf.bd}">
+      <div style="font-size:50px;margin-bottom:10px">${conf.emo}</div>
+      <h1 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 6px">${conf.ti}</h1>
+      <div style="display:inline-flex;align-items:center;gap:6px;background:${conf.bg};color:${conf.bd};padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:600;margin:6px 0 14px"><span style="width:7px;height:7px;border-radius:50%;background:${conf.bd};display:inline-block;animation:pulse 1.6s infinite"></span>Statut en direct</div>
+      <p style="color:var(--sub);font-size:15px;line-height:1.6;margin:0 auto;max-width:440px">${conf.tx}</p>
+      <div style="margin-top:14px;font-size:13px;color:var(--muted)"><b>${esc(myApp.matiere||"")}</b> · ${esc(myApp.note||"")}/20 · déposée le ${myApp.created_at?new Date(myApp.created_at).toLocaleDateString("fr-FR"):""}</div>
+      <div style="margin-top:22px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-ghost" onclick="nav('landing')">Retour à l'accueil</button>
+        ${st==="rejected"?`<button class="btn btn-accent" onclick="state._reapply=true;state._taForm=null;render()">Déposer une nouvelle candidature</button>`:""}
+      </div>
+    </div></div>`;
   }
   return `<div class="wrap fade" style="padding:54px 0 0">
     <div style="max-width:640px">
@@ -2228,11 +2397,20 @@ async function submitTutorApplication(){
   if(!sb){toast("Pas de connexion","err");return;}
   if(!state.user){toast("Connecte-toi pour candidater","warn");nav("login");return;}
   try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
-    const{error}=await sb.from("tutor_applications").insert({...data,user_id:u.user.id});
+    const{data:ins,error}=await sb.from("tutor_applications").insert({...data,user_id:u.user.id}).select().single();
     if(error){toast("Échec : "+error.message,"err",4000);return;}
-    toast("✓ Candidature envoyée ! On te répond sous 48h.","ok",4000);
-    state._taForm=null;state.tutorApplied=true;render();
+    toast("✓ Candidature envoyée ! Tu peux suivre son statut ici en temps réel.","ok",4500);
+    state._taForm=null;state._reapply=false;state.tutorApplied=true;state._myApp=ins||{...data,status:"pending",created_at:new Date().toISOString()};render();
   }catch(e){toast("Erreur","err");}
+}
+async function loadMyApplication(){
+  if(!sb||!state.user){state._myApp=null;return;}
+  if(state._myAppLoading)return;state._myAppLoading=true;
+  try{const{data:u}=await sb.auth.getUser();if(!u||!u.user){state._myApp=null;state._myAppLoading=false;return;}
+    const{data}=await sb.from("tutor_applications").select("*").eq("user_id",u.user.id).order("created_at",{ascending:false}).limit(1);
+    state._myApp=(data&&data[0])||null;
+  }catch(e){state._myApp=null;}
+  state._myAppLoading=false;render();
 }
 
 /* ===== Admin : gestion utilisateurs ===== */
@@ -2281,7 +2459,10 @@ function AdminApplicationsView(){
   return `<div style="display:grid;gap:10px">${state._apps.map(a=>`<div class="card" style="padding:18px">
     <div style="display:flex;justify-content:space-between;align-items:start;gap:10px;flex-wrap:wrap;margin-bottom:8px">
       <div><div style="font-weight:600;color:var(--ink);font-size:15px">${esc((a.prenom||"")+" "+(a.nom||""))} <span class="muted" style="font-size:12px">· ${esc(a.email||"")}</span></div><div class="muted" style="font-size:12px">${esc((univById(a.univ)||{}).nom||"")} · ${esc(a.annee||"")} · 📞 ${esc(a.phone||"—")}</div></div>
-      <span class="tag" style="background:${a.status==='accepted'?'#E7F8EC;color:#1E8C3C':a.status==='rejected'?'#FBEDEC;color:#B4453A':'#FFF3D9;color:#9A6A18'}">${a.status||"pending"}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="tag" style="background:${a.status==='accepted'?'#E7F8EC;color:#1E8C3C':a.status==='rejected'?'#FBEDEC;color:#B4453A':'#FFF3D9;color:#9A6A18'}">${a.status||"pending"}</span>
+        <button title="Supprimer cette candidature" onclick="deleteApplication(${a.id})" style="background:none;border:none;color:var(--muted);font-size:18px;width:28px;height:28px;border-radius:6px;cursor:pointer;line-height:1" onmouseover="this.style.background='#FBEDEC';this.style.color='#B4453A'" onmouseout="this.style.background='none';this.style.color='var(--muted)'">×</button>
+      </div>
     </div>
     <div style="font-size:14px;color:var(--text)"><b>Matière :</b> ${esc(a.matiere||"")} · <b>Note :</b> ${esc(a.note||"")}/20</div>
     ${a.message?`<div style="margin-top:8px;font-size:13.5px;color:var(--sub);line-height:1.5;background:#FBFBFA;padding:10px 12px;border-radius:8px">${esc(a.message)}</div>`:""}
@@ -2295,7 +2476,15 @@ function AdminApplicationsView(){
 }
 async function updateApplication(id,status){
   if(!sb)return;
-  try{await sb.from("tutor_applications").update({status}).eq("id",id);toast("Statut mis à jour","ok");loadAdminApplications();}catch(e){toast("Erreur","err");}
+  // MAJ optimiste : l'admin voit le changement tout de suite, le candidat est prévenu en live
+  if(state._apps){const i=state._apps.findIndex(a=>a.id===id);if(i>=0){state._apps[i]={...state._apps[i],status};render();}}
+  try{const{error}=await sb.from("tutor_applications").update({status}).eq("id",id);if(error){toast("Erreur : "+error.message,"err",4000);loadAdminApplications();return;}toast(status==="accepted"?"✓ Acceptée — le candidat est prévenu en direct":"✓ Rejetée — le candidat est prévenu en direct","ok",2800);}catch(e){toast("Erreur","err");loadAdminApplications();}
+}
+async function deleteApplication(id){
+  if(!sb)return;
+  if(!confirm("Supprimer définitivement cette candidature ? (à faire une fois traitée, pour garder l'espace propre)"))return;
+  if(state._apps){state._apps=state._apps.filter(a=>a.id!==id);render();}
+  try{const{error}=await sb.from("tutor_applications").delete().eq("id",id);if(error){toast("Erreur : "+error.message,"err",4000);loadAdminApplications();return;}toast("Candidature supprimée","ok",2000);}catch(e){toast("Erreur","err");loadAdminApplications();}
 }
 
 async function banUser(user_id,nom){
