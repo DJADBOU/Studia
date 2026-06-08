@@ -420,11 +420,18 @@ async function updNote(contenu_id,texte){
 /* ===== Recherche ===== */
 function performSearch(q){
   const ql=(q||"").toLowerCase().trim();
-  if(!ql)return [];
+  const f=state.searchFilters||{};
+  const hasFilter=f.univ||f.faculte||f.annee;
+  // Si aucun texte ET aucun filtre → rien. Avec un filtre seul, on liste tout ce qui matche.
+  if(!ql&&!hasFilter)return [];
   return state.contenus.filter(c=>{
-    const blob=(c.titre+" "+c.matiere+" "+c.tuteur+" "+(c.description||"")+" "+labelFor(c.type)+" "+c.annee).toLowerCase();
+    if(f.univ&&c.univ!==f.univ)return false;
+    if(f.faculte&&c.faculte!==f.faculte)return false;
+    if(f.annee&&c.annee!==f.annee)return false;
+    if(!ql)return true;
+    const blob=((c.titre||"")+" "+(c.matiere||"")+" "+(c.tuteur||"")+" "+(c.description||"")+" "+labelFor(c.type)+" "+(c.annee||"")).toLowerCase();
     return blob.includes(ql);
-  }).slice(0,20);
+  }).slice(0,30);
 }
 
 /* ===== Public stats (landing) ===== */
@@ -617,6 +624,183 @@ async function submitComment(contenu_id){
   if(!v){toast("Écris quelque chose d'abord","warn");return;}
   const r=await postComment(contenu_id,v);
   if(r.ok){t.value="";state.comments=await loadComments(contenu_id);render();}
+}
+
+/* ===== Signaler une erreur (feedback par sujet) ===== */
+async function reportError(contenu_id){
+  if(!sb||!state.user){toast("Connecte-toi pour signaler une erreur","warn");nav("login");return;}
+  const msg=prompt("Décris l'erreur repérée (faute, mauvaise réponse, page manquante, lien cassé…) :");
+  if(!msg||!msg.trim())return;
+  try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
+    const{error}=await sb.from("signalements").insert({contenu_id,user_id:u.user.id,email:state.user.email,message:msg.trim()});
+    if(error){toast("Échec : "+error.message,"err",4000);return;}
+    toast("✓ Merci ! Ton signalement a été transmis à l'équipe.","ok",3500);
+  }catch(e){toast("Erreur : "+e.message,"err");}
+}
+async function loadSignalements(){
+  if(!sb)return;
+  state._signalLoading=true;render();
+  try{const{data}=await sb.from("signalements").select("*").order("created_at",{ascending:false});state._signalements=data||[];}catch(e){state._signalements=[];}
+  state._signalLoading=false;render();
+}
+function AdminSignalementsView(){
+  if(!state._signalements){if(!state._signalLoading)loadSignalements();return '<div class="card" style="padding:40px;text-align:center;color:var(--muted)">⏳ Chargement…</div>';}
+  const list=state._signalements;
+  const pending=list.filter(s=>s.status!=="resolved").length;
+  if(!list.length)return '<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucun signalement pour l\'instant. 🎉</div>';
+  return `<div class="muted" style="margin-bottom:10px">${pending} à traiter · ${list.length} au total</div><div style="display:grid;gap:10px">${list.map(s=>{
+    const c=state.contenus.find(x=>x.id===s.contenu_id);
+    const titre=c?c.titre:"(contenu supprimé)";
+    return `<div class="card" style="padding:16px 18px;${s.status==='resolved'?'opacity:.55':''}">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <div style="font-weight:600;color:var(--ink);font-size:14.5px">${esc(titre)}${c?` <span class="muted" style="font-size:12px">· ${esc((univById(c.univ)||{}).nom||"")} · ${esc(c.matiere||"")} · ${esc(c.annee||"")}</span>`:""}</div>
+        <span class="tag" style="background:${s.status==='resolved'?'#E7F8EC;color:#1E8C3C':'#FFF3D9;color:#9A6A18'}">${s.status==='resolved'?'Traité':'À traiter'}</span>
+      </div>
+      <div style="font-size:14px;color:var(--text);line-height:1.5;background:#FBFBFA;padding:10px 12px;border-radius:8px;white-space:pre-wrap">${esc(s.message||"")}</div>
+      <div class="muted" style="font-size:11.5px;margin-top:6px">${esc(s.email||"anonyme")} · ${fmtRelativeDate(s.created_at)}</div>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+        ${c?`<button class="btn btn-ghost btn-sm" onclick="adminOpenContenu('${c.id}')">Voir le contenu</button>`:""}
+        ${s.status!=='resolved'?`<button class="btn btn-accent btn-sm" onclick="resolveSignalement(${s.id},'resolved')">✓ Marquer traité</button>`:`<button class="btn btn-ghost btn-sm" onclick="resolveSignalement(${s.id},'pending')">↺ Rouvrir</button>`}
+        <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="deleteSignalement(${s.id})">Supprimer</button>
+      </div>
+    </div>`;}).join("")}</div>`;
+}
+async function resolveSignalement(id,status){
+  if(!sb)return;
+  try{await sb.from("signalements").update({status:status||"resolved"}).eq("id",id);loadSignalements();}catch(e){toast("Erreur","err");}
+}
+async function deleteSignalement(id){
+  if(!sb)return;if(!confirm("Supprimer définitivement ce signalement ?"))return;
+  try{await sb.from("signalements").delete().eq("id",id);state._signalements=(state._signalements||[]).filter(s=>s.id!==id);render();}catch(e){toast("Erreur","err");}
+}
+function adminOpenContenu(id){const c=state.contenus.find(x=>x.id===id);if(!c)return;state.univ=univById(c.univ);state.faculte=facById(c.univ,c.faculte);state.matiere=c.matiere;state.annee=c.annee;state.semestre=c.semestre||"S1";openItem(id);}
+
+/* ===== Entraide : contributions étudiantes ===== */
+function openContribute(){
+  if(!state.user){toast("Connecte-toi pour proposer un document","warn");nav("login");return;}
+  state.contribOpen=true;
+  const p=state.profile||{};
+  state._contribForm={univ:p.univ||"uca",faculte:p.faculte||"",annee:p.annee||"L1"};
+  state._contribBusy=false;
+  renderContribute();
+}
+function closeContribute(){state.contribOpen=false;const r=document.getElementById("modalRoot");if(r&&!state.searchOpen&&!state.modal&&!(state.newC&&state.newC.open))r.innerHTML="";}
+function cbUnivChange(v){
+  state._contribForm=Object.assign({},state._contribForm||{},{univ:v,faculte:""});
+  const u=univById(v);
+  const sel=document.getElementById("cbFaculte");
+  if(sel)sel.innerHTML=((u&&u.facultes)||[]).map(f=>`<option value="${f.id}">${esc(f.nom)}</option>`).join("")||'<option value="">—</option>';
+}
+function renderContribute(){
+  const r=document.getElementById("modalRoot");if(!r)return;
+  if(!state.contribOpen)return;
+  const cf=state._contribForm||{};
+  const locked=state.user&&!isAdminUser()&&hasProfile(); // étudiant verrouillé sur sa fac
+  const u=univById(cf.univ||"uca");
+  const facs=(u&&u.facultes)||[];
+  const busy=!!state._contribBusy;
+  const sel="width:100%;padding:9px 10px;font-size:13.5px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text)";
+  r.innerHTML=`<div class="modal-bg" onclick="closeContribute()"><div class="modal fade" onclick="event.stopPropagation()" style="max-width:520px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 class="serif" style="font-size:22px;color:var(--ink);margin:0">Proposer un document</h3><button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px" onclick="closeContribute()">✕</button></div>
+    <p class="muted" style="margin:0 0 16px;font-size:13px;line-height:1.5">Partage un cours, une fiche ou un corrigé <b>original</b> (le tien). L'équipe le vérifie avant publication — il ne sera pas visible immédiatement. ⚠️ Ne propose jamais le support d'un prof : seul le contenu original te protège juridiquement.</p>
+    <div style="display:grid;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Université</label>
+          <select id="cbUniv" style="${sel}" ${locked?"disabled":""} onchange="cbUnivChange(this.value)">${UNIVS.map(x=>`<option value="${x.id}" ${cf.univ===x.id?"selected":""}>${esc(x.nom)}</option>`).join("")}</select></div>
+        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Filière</label>
+          <select id="cbFaculte" style="${sel}" ${locked?"disabled":""}>${facs.map(f=>`<option value="${f.id}" ${cf.faculte===f.id?"selected":""}>${esc(f.nom)}</option>`).join("")||'<option value="">—</option>'}</select></div>
+        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Année</label>
+          <select id="cbAnnee" style="${sel}">${["L1","L2","L3","M1","M2"].map(a=>`<option value="${a}" ${cf.annee===a?"selected":""}>${a}</option>`).join("")}</select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px">
+        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Matière *</label>
+          <input id="cbMatiere" class="input" placeholder="Ex. Microéconomie" value="${esc(cf.matiere||"")}"/></div>
+        <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Type</label>
+          <select id="cbType" style="${sel}">${typeIds().map(t=>`<option value="${t}">${esc(labelFor(t))}</option>`).join("")}</select></div>
+      </div>
+      <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Titre *</label>
+        <input id="cbTitre" class="input" placeholder="Ex. Fiche de révision chapitre 3" value="${esc(cf.titre||"")}"/></div>
+      <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Description (optionnel)</label>
+        <textarea id="cbDesc" class="input" rows="2" style="resize:vertical;font-family:inherit" placeholder="Ce que contient le document…">${esc(cf.description||"")}</textarea></div>
+      <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Fichier (PDF ou image, max 20 Mo) *</label>
+        <input id="cbFile" type="file" accept="image/*,application/pdf" style="font-size:13px"/></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeContribute()">Annuler</button>
+      <button class="btn btn-accent" style="flex:1" ${busy?"disabled":""} onclick="submitContribution()">${busy?"Envoi…":"Envoyer ma proposition"}</button>
+    </div>
+  </div></div>`;
+}
+async function submitContribution(){
+  if(!sb||!state.user){toast("Connecte-toi pour proposer un document","warn");nav("login");return;}
+  const get=id=>(document.getElementById(id)||{}).value||"";
+  const fileEl=document.getElementById("cbFile");
+  const theFile=fileEl&&fileEl.files&&fileEl.files[0];
+  const f={univ:get("cbUniv"),faculte:get("cbFaculte"),annee:get("cbAnnee"),matiere:get("cbMatiere").trim(),type:get("cbType"),titre:get("cbTitre").trim(),description:get("cbDesc").trim()};
+  // mémorise la saisie au cas où l'upload échoue (on re-render le modal)
+  state._contribForm=Object.assign({},state._contribForm,f);
+  if(!f.titre||!f.matiere){toast("Titre et matière sont obligatoires","err");return;}
+  if(!theFile){toast("Ajoute un fichier (PDF ou image)","err");return;}
+  if(theFile.size>20*1024*1024){toast("Fichier trop lourd (max 20 Mo)","err");return;}
+  state._contribBusy=true;renderContribute();
+  try{const{data:u}=await sb.auth.getUser();if(!u||!u.user){state._contribBusy=false;renderContribute();return;}
+    const ext=(theFile.name.match(/\.[^.]+$/)||[""])[0]||"";
+    const path=`${u.user.id}/${Date.now()}_${Math.random().toString(36).slice(2,7)}${ext}`;
+    const{error:upErr}=await sb.storage.from("contributions").upload(path,theFile,{contentType:theFile.type||undefined});
+    if(upErr){state._contribBusy=false;renderContribute();toast("Échec upload : "+upErr.message,"err",5000);return;}
+    const{error}=await sb.from("contributions").insert({user_id:u.user.id,email:state.user.email,univ:f.univ,faculte:f.faculte,annee:f.annee,matiere:f.matiere,type:f.type,titre:f.titre,description:f.description||null,file_path:path,file_name:theFile.name});
+    if(error){state._contribBusy=false;renderContribute();toast("Échec : "+error.message,"err",5000);return;}
+    state.contribOpen=false;state._contribForm=null;state._contribBusy=false;
+    const r=document.getElementById("modalRoot");if(r)r.innerHTML="";
+    toast("✓ Merci ! Ta proposition a été envoyée. L'équipe la vérifie avant publication.","ok",4500);
+  }catch(e){state._contribBusy=false;renderContribute();toast("Erreur : "+e.message,"err");}
+}
+async function loadContributions(){
+  if(!sb)return;
+  state._contribLoading=true;render();
+  try{const{data}=await sb.from("contributions").select("*").order("created_at",{ascending:false});state._contributions=data||[];}catch(e){state._contributions=[];}
+  state._contribLoading=false;render();
+}
+function AdminContributionsView(){
+  if(!state._contributions){if(!state._contribLoading)loadContributions();return '<div class="card" style="padding:40px;text-align:center;color:var(--muted)">⏳ Chargement…</div>';}
+  const list=state._contributions;
+  const pending=list.filter(c=>(c.status||"pending")==="pending").length;
+  if(!list.length)return '<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucune proposition étudiante pour l\'instant.</div>';
+  const badge=s=>s==="processed"?'#E7F8EC;color:#1E8C3C':s==="rejected"?'#FBEDEC;color:#B4453A':'#FFF3D9;color:#9A6A18';
+  const lbl=s=>s==="processed"?"Traité":s==="rejected"?"Rejeté":"En attente";
+  return `<div class="muted" style="margin-bottom:10px">${pending} en attente · ${list.length} au total</div><div style="display:grid;gap:10px">${list.map(c=>{
+    const st=c.status||"pending";
+    return `<div class="card" style="padding:16px 18px;${st!=="pending"?'opacity:.6':''}">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+        <div style="font-weight:600;color:var(--ink);font-size:15px">${esc(c.titre||"")} <span class="muted" style="font-size:12px">· ${esc(labelFor(c.type))}</span></div>
+        <span class="tag" style="background:${badge(st)}">${lbl(st)}</span>
+      </div>
+      <div class="muted" style="font-size:12.5px">${esc((univById(c.univ)||{}).nom||"")} · ${esc((((univById(c.univ)||{facultes:[]}).facultes||[]).find(f=>f.id===c.faculte)||{}).nom||c.faculte||"")} · ${esc(c.annee||"")} · <b style="color:var(--accentDark)">${esc(c.matiere||"")}</b></div>
+      ${c.description?`<div style="margin-top:8px;font-size:13.5px;color:var(--sub);line-height:1.5;background:#FBFBFA;padding:10px 12px;border-radius:8px">${esc(c.description)}</div>`:""}
+      <div class="muted" style="font-size:11.5px;margin-top:6px">Proposé par ${esc(c.email||"?")} · ${fmtRelativeDate(c.created_at)} · 📎 ${esc(c.file_name||"fichier")}</div>
+      <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-ink btn-sm" onclick="downloadContribution('${esc(c.file_path)}')">⬇ Télécharger le PDF</button>
+        ${st!=="processed"?`<button class="btn btn-accent btn-sm" onclick="updateContribution(${c.id},'processed')">✓ Marquer traité</button>`:""}
+        ${st!=="rejected"?`<button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="updateContribution(${c.id},'rejected')">✕ Rejeter</button>`:""}
+        ${st!=="pending"?`<button class="btn btn-ghost btn-sm" onclick="updateContribution(${c.id},'pending')">↺ Remettre en attente</button>`:""}
+        <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="deleteContribution(${c.id},'${esc(c.file_path)}')">🗑 Supprimer</button>
+      </div>
+    </div>`;}).join("")}</div>`;
+}
+async function downloadContribution(path){
+  if(!sb)return;
+  try{const{data,error}=await sb.storage.from("contributions").createSignedUrl(path,3600);
+    if(error||!data){toast("Téléchargement impossible : "+((error&&error.message)||""),"err",4000);return;}
+    window.open(data.signedUrl,"_blank");
+  }catch(e){toast("Erreur : "+e.message,"err");}
+}
+async function updateContribution(id,status){
+  if(!sb)return;
+  try{await sb.from("contributions").update({status}).eq("id",id);loadContributions();}catch(e){toast("Erreur","err");}
+}
+async function deleteContribution(id,path){
+  if(!sb)return;if(!confirm("Supprimer cette proposition et son fichier ?"))return;
+  try{if(path)await sb.storage.from("contributions").remove([path]);await sb.from("contributions").delete().eq("id",id);state._contributions=(state._contributions||[]).filter(c=>c.id!==id);render();}catch(e){toast("Erreur","err");}
 }
 
 /* ===== PDF per-user watermark ===== */
@@ -873,9 +1057,14 @@ const state={
   currentNote:null,
   searchOpen:false,
   searchQuery:"",
+  searchFilters:{univ:"",faculte:"",annee:""},
   publicStats:null,
   univsTab:"univs",
   onboardingStep:0,
+  contribOpen:false,
+  _contribForm:null,
+  _signalements:null,_signalLoading:false,
+  _contributions:null,_contribLoading:false,
 };
 
 /* ===== templates ===== */
@@ -1242,6 +1431,7 @@ function MobileMenu(){
   ${!isLockedStudent?`<button onclick="goProgramme()">${showMyEspace?"Explorer":"Programme"}</button>`:""}
   <button onclick="nav('tarifs')">Tarifs</button>
   <button onclick="nav('tuteur')">Devenir tuteur</button>
+  ${state.user&&!isAdminUser()?`<button onclick="openContribute()">📥 Proposer un doc</button>`:""}
   ${state.user?`<button onclick="goProfile()">Mon profil</button>`+(state.user.role==="admin"?`<button onclick="nav('admin')">Console</button>`:"")+`<button onclick="logout()">Déconnexion</button>`:`<button onclick="nav('login')">Connexion</button>`}
   ${state.subscribed?"":`<button onclick="setModal(true)">S'abonner</button>`}
 </div></div>`;}
@@ -1259,6 +1449,7 @@ function Nav(){
       ${searchBtn}
       <button class="link ${state.view==="tarifs"?"on":""}" onclick="nav('tarifs')">Tarifs</button>
       <button class="link ${state.view==="tuteur"?"on":""}" onclick="nav('tuteur')">Devenir tuteur</button>
+      ${state.user&&!isAdminUser()?`<button class="link" onclick="openContribute()" title="Partager un cours, une fiche, un corrigé">📥 Proposer</button>`:""}
       ${navRight()}
     </div>
     <button class="burger" onclick="toggleMenu()">☰</button>
@@ -1542,6 +1733,8 @@ function Detail(){
       <button class="btn btn-ghost btn-sm" onclick="downloadProtected('${it.id}')">⬇ Télécharger le sujet (tatoué à toi)</button>
       ${it.corrige_path?`<button class="btn btn-ghost btn-sm" onclick="downloadProtected('${it.id}_corr')">⬇ Télécharger le corrigé (tatoué)</button>`:""}
     </div>`:""}
+
+    ${unlocked?`<div style="margin-top:12px"><button onclick="reportError('${it.id}')" style="background:none;border:none;color:var(--sub);font-size:12.5px;cursor:pointer;padding:4px 0;text-decoration:underline;text-underline-offset:3px">⚠ Signaler une erreur sur ce contenu</button></div>`:""}
 
     ${unlocked&&state.user?`<div class="notes-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="font-size:14px;color:var(--ink);font-weight:600;margin:0">📝 Mes notes (privées)</h3>${state.bookmarks.has(it.id)?'<span class="pill" style="background:#FFF3D9;color:#9A6A18">★ Favori</span>':""}</div>
@@ -1972,6 +2165,8 @@ function AdminConsole(){
         <button class="btn btn-ink btn-sm" onclick="state.a.view='stats';render()">📊 Dashboard</button>
         <button class="btn btn-ghost btn-sm" onclick="state.a.view='users';render()">👥 Utilisateurs</button>
         <button class="btn btn-ghost btn-sm" onclick="state.a.view='applications';render()">📩 Candidatures tuteurs</button>
+        <button class="btn btn-ghost btn-sm" onclick="state.a.view='contributions';render()">📥 Contributions${(state._contributions&&state._contributions.filter(c=>c.status==='pending').length)?` <span class="pill" style="margin-left:4px">${state._contributions.filter(c=>c.status==='pending').length}</span>`:""}</button>
+        <button class="btn btn-ghost btn-sm" onclick="state.a.view='signalements';render()">⚠ Signalements${(state._signalements&&state._signalements.filter(c=>c.status==='pending').length)?` <span class="pill" style="margin-left:4px">${state._signalements.filter(c=>c.status==='pending').length}</span>`:""}</button>
       </div>
     </div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-bottom:32px">${UNIVS.map(u=>`<div class="card ${u.actif?"card-h":""}" style="padding:22px;${u.actif?"":"opacity:.55"}" ${u.actif?`onclick="aPickUniv('${u.id}')"`:""}><div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px">${univLogoHTML(u)}${u.actif?'<span class="pill">Disponible</span>':'<span class="tag">Bientôt</span>'}</div><div style="font-weight:600;color:var(--ink);font-size:15px">${u.nom}</div><div class="muted">${u.ville}</div></div>`).join("")}</div>
@@ -1982,6 +2177,10 @@ function AdminConsole(){
     body=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px"><h2 class="serif" style="font-size:28px;color:var(--ink);margin:0">👥 Utilisateurs</h2><button class="btn btn-ghost btn-sm" onclick="state.a.view='univ';render()">← Retour</button></div>${AdminUsersView()}`;
   } else if(a.view==="applications"){
     body=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px"><h2 class="serif" style="font-size:28px;color:var(--ink);margin:0">📩 Candidatures tuteurs</h2><button class="btn btn-ghost btn-sm" onclick="state.a.view='univ';render()">← Retour</button></div>${AdminApplicationsView()}`;
+  } else if(a.view==="contributions"){
+    body=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px"><h2 class="serif" style="font-size:28px;color:var(--ink);margin:0">📥 Contributions entraide</h2><button class="btn btn-ghost btn-sm" onclick="state.a.view='univ';render()">← Retour</button></div>${AdminContributionsView()}`;
+  } else if(a.view==="signalements"){
+    body=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px"><h2 class="serif" style="font-size:28px;color:var(--ink);margin:0">⚠ Signalements d'erreurs</h2><button class="btn btn-ghost btn-sm" onclick="state.a.view='univ';render()">← Retour</button></div>${AdminSignalementsView()}`;
   } else if(a.view==="fac"){
     body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.univ.nom}</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${a.univ.facultes.map(f=>`<div class="card card-h" style="padding:24px" onclick="aPickFac('${f.id}')"><h3 style="font-size:18px;color:var(--ink);font-weight:600;margin:0 0 6px">${f.nom}</h3><div class="muted">${state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===f.id).length} contenus</div></div>`).join("")}</div>`;
   } else if(a.view==="niv"){
@@ -2388,26 +2587,56 @@ async function handleFiles(files){
 async function regen(id){const c=state.contenus.find(x=>x.id===id);if(!c)return;c.outUrl=null;c.qr=null;render();await processRecord(c);render();}
 
 /* ===== Search modal ===== */
-function openSearch(){state.searchOpen=true;state.searchQuery="";renderSearchModal();setTimeout(()=>{const i=document.getElementById("searchInput");if(i)i.focus();},50);}
-function closeSearch(){state.searchOpen=false;renderSearchModal();}
-function onSearchInput(v){
-  state.searchQuery=v;
-  const rs=document.getElementById("searchResults");if(rs)rs.innerHTML=searchResultsHTML();
-  const ct=document.getElementById("searchCount");if(ct){const n=state.searchQuery.length<2?0:performSearch(state.searchQuery).length;ct.textContent=n+" résultat"+(n>1?"s":"");}
+function openSearch(){
+  state.searchOpen=true;state.searchQuery="";
+  // Pré-remplit le filtre fac/filière pour un étudiant verrouillé sur sa fac (plus rapide)
+  if(state.user&&!isAdminUser()&&hasProfile()){state.searchFilters={univ:state.profile.univ||"",faculte:state.profile.faculte||"",annee:state.profile.annee||""};}
+  renderSearchModal();setTimeout(()=>{const i=document.getElementById("searchInput");if(i)i.focus();},50);
 }
+function closeSearch(){state.searchOpen=false;renderSearchModal();}
+function refreshSearchResults(){
+  const rs=document.getElementById("searchResults");if(rs)rs.innerHTML=searchResultsHTML();
+  const ct=document.getElementById("searchCount");if(ct){const n=searchCount();ct.textContent=n+" résultat"+(n>1?"s":"");}
+}
+function onSearchInput(v){state.searchQuery=v;refreshSearchResults();}
+function setSearchFilter(k,v){
+  state.searchFilters=Object.assign({},state.searchFilters,{[k]:v});
+  if(k==="univ")state.searchFilters.faculte=""; // change d'univ → reset filière
+  // Re-render filtres (pour MAJ les filières) + résultats, sans toucher l'input texte
+  const fb=document.getElementById("searchFilters");if(fb)fb.innerHTML=searchFiltersHTML();
+  refreshSearchResults();
+}
+function clearSearchFilters(){state.searchFilters={univ:"",faculte:"",annee:""};const fb=document.getElementById("searchFilters");if(fb)fb.innerHTML=searchFiltersHTML();refreshSearchResults();}
 function openSearchResult(id){closeSearch();const c=state.contenus.find(x=>x.id===id);if(!c)return;state.univ=univById(c.univ);state.faculte=facById(c.univ,c.faculte);state.matiere=c.matiere;state.annee=c.annee;state.semestre=c.semestre||"S1";openItem(id);}
+function searchCount(){const f=state.searchFilters||{};const hasFilter=f.univ||f.faculte||f.annee;if(state.searchQuery.length<2&&!hasFilter)return 0;return performSearch(state.searchQuery).length;}
+function searchFiltersHTML(){
+  const f=state.searchFilters||{};
+  const u=univById(f.univ);
+  const sel="padding:7px 9px;font-size:12.5px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);max-width:100%";
+  const facs=(u&&u.facultes)||[];
+  const hasFilter=f.univ||f.faculte||f.annee;
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+    <select style="${sel}" onchange="setSearchFilter('univ',this.value)"><option value="">Toutes universités</option>${UNIVS.map(x=>`<option value="${x.id}" ${f.univ===x.id?"selected":""}>${esc(x.nom)}</option>`).join("")}</select>
+    <select style="${sel}" onchange="setSearchFilter('faculte',this.value)" ${facs.length?"":"disabled"}><option value="">Toutes filières</option>${facs.map(x=>`<option value="${x.id}" ${f.faculte===x.id?"selected":""}>${esc(x.nom)}</option>`).join("")}</select>
+    <select style="${sel}" onchange="setSearchFilter('annee',this.value)"><option value="">Toute année</option>${["L1","L2","L3","M1","M2"].map(a=>`<option value="${a}" ${f.annee===a?"selected":""}>${a}</option>`).join("")}</select>
+    ${hasFilter?`<button onclick="clearSearchFilters()" style="background:none;border:none;color:var(--accentDark);font-size:12px;cursor:pointer;padding:4px 6px">✕ Effacer</button>`:""}
+  </div>`;
+}
 function searchResultsHTML(){
-  if(state.searchQuery.length<2)return '<div class="muted" style="padding:30px;text-align:center">Tape au moins 2 caractères pour rechercher</div>';
+  const f=state.searchFilters||{};
+  const hasFilter=f.univ||f.faculte||f.annee;
+  if(state.searchQuery.length<2&&!hasFilter)return '<div class="muted" style="padding:30px;text-align:center">Tape au moins 2 caractères, ou choisis un filtre ci-dessus.</div>';
   const results=performSearch(state.searchQuery);
-  if(!results.length)return '<div class="muted" style="padding:30px;text-align:center">Aucun résultat pour "'+esc(state.searchQuery)+'"</div>';
+  if(!results.length)return '<div class="muted" style="padding:30px;text-align:center">Aucun résultat'+(state.searchQuery?' pour "'+esc(state.searchQuery)+'"':'')+'.</div>';
   return results.map(c=>{const u=univById(c.univ);return `<div class="search-item" onclick="openSearchResult('${c.id}')"><div class="ic" style="width:36px;height:36px">${smartIcon(c)}</div><div style="flex:1;min-width:0"><div style="font-weight:500;color:var(--ink);font-size:14.5px;margin-bottom:2px">${esc(c.titre||"")}</div><div class="muted" style="font-size:12px">${esc(c.matiere||"")} · ${labelFor(c.type)} · ${u?u.nom:""} ${c.annee||""}</div></div>${c.gratuit?'<span class="pill">Gratuit</span>':""}</div>`;}).join("");
 }
 function renderSearchModal(){
   const root=document.getElementById("modalRoot");
   if(!state.searchOpen){if(!state.modal&&!(state.newC&&state.newC.open))root.innerHTML="";return;}
-  const n=state.searchQuery.length<2?0:performSearch(state.searchQuery).length;
+  const n=searchCount();
   root.innerHTML=`<div class="search-overlay" onclick="closeSearch()"><div class="search-modal" onclick="event.stopPropagation()">
     <div style="position:relative"><input class="input" id="searchInput" oninput="onSearchInput(this.value)" value="${esc(state.searchQuery||"")}" placeholder="🔍 Rechercher un cours, un TD, une matière, un tuteur..." style="padding:14px 16px;font-size:15px;border:0;border-bottom:1px solid var(--border);border-radius:14px 14px 0 0" autocomplete="off"/></div>
+    <div id="searchFilters" style="padding:10px 14px;border-bottom:1px solid var(--border);background:#FBFBFA">${searchFiltersHTML()}</div>
     <div class="search-results" id="searchResults">${searchResultsHTML()}</div>
     <div style="padding:10px 16px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between"><span id="searchCount">${n} résultat${n>1?"s":""}</span><span>Esc pour fermer</span></div>
   </div></div>`;
