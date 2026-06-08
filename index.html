@@ -306,15 +306,24 @@ function isEditingField(){
   return tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||el.isContentEditable;
 }
 // Render qui n'interrompt jamais une saisie en cours : si un champ a le focus,
-// on diffère jusqu'au blur au lieu de détruire le DOM.
-let _pendingRender=false;
+// on diffère le render et on le rejoue dès que la saisie est terminée.
+let _pendingRender=false,_pendRenderPoll=null;
+function flushPendingRender(){
+  if(isEditingField())return;            // toujours en train de taper → on attend
+  if(_pendRenderPoll){clearInterval(_pendRenderPoll);_pendRenderPoll=null;}
+  if(_pendingRender){_pendingRender=false;render();}
+}
 function safeRender(){
-  if(isEditingField()){_pendingRender=true;return;}
+  if(isEditingField()){
+    _pendingRender=true;
+    // Poll léger qui ne vit que tant qu'un render est en attente ET qu'un champ est focus.
+    if(!_pendRenderPoll)_pendRenderPoll=setInterval(flushPendingRender,300);
+    return;
+  }
   render();
 }
-document.addEventListener("focusout",()=>{
-  if(_pendingRender){_pendingRender=false;setTimeout(()=>{if(!isEditingField())render();},80);}
-},true);
+// Sur les vrais navigateurs, le blur déclenche un flush immédiat (sans attendre le poll).
+document.addEventListener("focusout",()=>{if(_pendingRender)setTimeout(flushPendingRender,60);},true);
 
 let _realtimeCh=null;
 function setupRealtime(){
