@@ -284,6 +284,119 @@ body.hide-content .hidden-on-blur::after{content:"⛔ Capture détectée — l'�
 .page-content h1{font-family:var(--serif);font-size:42px;color:var(--ink);margin:0 0 18px;line-height:1.1}
 .page-content h2{font-family:var(--serif);font-size:22px;color:var(--ink);margin:32px 0 12px}
 .page-content p{font-size:15px;color:var(--text);line-height:1.7;margin:0 0 14px}
+
+/* ===== Landing v2 — refonte « nouvelle génération » ===== */
+.lp-hero{position:relative;overflow:hidden;isolation:isolate}
+.lp-hero-bg{position:absolute;inset:0;z-index:-1;background:radial-gradient(58% 48% at 50% -4%,rgba(52,199,89,.18),transparent 70%),radial-gradient(38% 40% at 86% 16%,rgba(91,217,116,.16),transparent 72%),radial-gradient(40% 48% at 10% 34%,rgba(42,157,71,.12),transparent 72%),var(--bg)}
+.lp-hero-bg::before{content:"";position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:48px 48px;opacity:.55;-webkit-mask-image:radial-gradient(72% 62% at 50% 26%,#000,transparent 76%);mask-image:radial-gradient(72% 62% at 50% 26%,#000,transparent 76%)}
+.lp-hero-in{position:relative;text-align:center;max-width:800px;padding:60px 24px 72px}
+.lp-badge{display:inline-flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:40px;padding:6px 16px 6px 7px;box-shadow:0 6px 22px rgba(26,26,24,.07);font-size:13px;color:var(--text);font-weight:500}
+.lp-avs{display:flex}
+.lp-avs span{width:26px;height:26px;border-radius:50%;border:2px solid var(--surface);margin-left:-9px;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.lp-avs span:first-child{margin-left:0}
+.lp-h1{font-family:var(--serif);font-size:clamp(44px,7.2vw,84px);line-height:.98;letter-spacing:-2px;color:var(--ink);margin:22px 0 18px;font-weight:400}
+.lp-h1 i{font-style:italic;color:var(--accentDark)}
+.lp-sub{font-size:clamp(16.5px,2.1vw,21px);line-height:1.5;color:var(--sub);margin:0 auto 28px;max-width:600px}
+.lp-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.lp-trust{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-top:24px;font-size:12.5px;color:var(--muted);font-weight:500}
+.lp-trust span{display:inline-flex;align-items:center;gap:5px}
+.lp-float{position:absolute;z-index:1;background:var(--surface);border:1px solid var(--border);border-radius:15px;box-shadow:0 18px 42px rgba(26,26,24,.11);padding:11px 13px;display:flex;align-items:center;gap:10px;animation:lpFloat 6s ease-in-out infinite;transition:translate .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s}
+@keyframes lpFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-13px)}}
+.lp-float .fa{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0}
+.lp-float .ft{font-size:12.5px;color:var(--ink);font-weight:600;line-height:1.25;white-space:nowrap}
+.lp-float .fm{font-size:11px;color:var(--sub)}
+.lp-float .note{margin-left:4px;background:var(--accentSoft);color:var(--accentDark);font-weight:700;font-size:12px;padding:3px 8px;border-radius:7px;white-space:nowrap}
+.lp-f1{top:15%;left:1%;animation-delay:.2s}
+.lp-f2{top:22%;right:1%;animation-delay:1.4s}
+.lp-f3{bottom:13%;left:5%;animation-delay:.8s}
+.lp-f4{bottom:18%;right:4%;animation-delay:2s}
+@media(max-width:1040px){.lp-float{display:none}}
+.lp-logos{display:flex;align-items:center;justify-content:center;gap:30px;flex-wrap:wrap;padding:4px 0}
+.lp-logos .ll{height:40px;display:flex;align-items:center;filter:grayscale(1);opacity:.5;transition:filter .25s,opacity .25s}
+.lp-logos .ll:hover{filter:grayscale(0);opacity:1}
+.lp-logos .ll img{max-height:36px;max-width:118px;object-fit:contain}
+.offer-panel{display:none}
+.offer-panel.on{display:block;animation:fadeUp .35s ease}
+.offer-feat{display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-bottom:1px solid var(--border)}
+.offer-feat:last-child{border-bottom:none}
+.offer-feat .ck{width:24px;height:24px;border-radius:50%;background:var(--accentSoft);color:var(--accentDark);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;font-weight:700}
+.acc-item{border-bottom:1px solid var(--border)}
+.acc-q{width:100%;display:flex;justify-content:space-between;align-items:center;gap:16px;background:none;border:none;padding:20px 2px;text-align:left;font-size:clamp(15px,2vw,17px);font-weight:600;color:var(--ink);transition:color .2s}
+.acc-q:hover{color:var(--accentDark)}
+.acc-ic{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:var(--bg);border:1px solid var(--borderStrong);display:flex;align-items:center;justify-content:center;transition:transform .35s cubic-bezier(.2,.7,.2,1),background .2s,color .2s,border-color .2s;color:var(--sub);font-size:13px;line-height:1}
+.acc-item.open .acc-ic{transform:rotate(180deg);background:var(--accent);color:#fff;border-color:var(--accent)}
+.acc-a{display:grid;grid-template-rows:0fr;transition:grid-template-rows .38s cubic-bezier(.2,.7,.2,1)}
+.acc-item.open .acc-a{grid-template-rows:1fr}
+.acc-a-min{overflow:hidden}
+.acc-a-min>div{padding:0 2px 22px;color:var(--sub);font-size:14.5px;line-height:1.65}
+.faq-bubble{background:var(--accentSoft);border-radius:4px 14px 14px 14px;padding:14px 16px;color:var(--text);font-size:14.5px;line-height:1.6;display:flex;gap:10px;align-items:flex-start}
+.faq-bubble .fb-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0}
+.major-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:22px 18px;text-align:center;transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s,border-color .3s}
+.major-card:hover{border-color:var(--accent);transform:translateY(-4px);box-shadow:0 16px 34px rgba(30,140,60,.12)}
+.major-av{width:72px;height:72px;border-radius:50%;margin:0 auto 13px;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:23px;letter-spacing:-1px}
+.major-note{display:inline-flex;align-items:center;gap:4px;background:var(--accentSoft);color:var(--accentDark);font-weight:700;font-size:12.5px;padding:4px 11px;border-radius:20px;margin-top:9px}
+.major-av img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.major-join{cursor:pointer;border-style:dashed;border-color:var(--borderStrong)}
+.major-join:hover{border-color:var(--accent);transform:translateY(-4px);box-shadow:0 16px 34px rgba(30,140,60,.12)}
+.major-av-join{background:var(--accentSoft);color:var(--accentDark);font-size:32px;font-weight:400;transition:transform .3s cubic-bezier(.2,.7,.2,1)}
+.major-join:hover .major-av-join{transform:scale(1.07)}
+.major-join .major-note{transition:transform .2s}
+.major-join:hover .major-note{transform:translateX(3px)}
+/* ----- couche d'animations « vivant » ----- */
+#lp-progress{position:fixed;top:0;left:0;right:0;height:3px;transform-origin:0 50%;transform:scaleX(0);background:linear-gradient(90deg,var(--accent),#5BD974,var(--accentDark));z-index:300;transition:transform .12s linear;pointer-events:none}
+.lp-hero-bg::before{animation:gridPan 26s linear infinite}
+.lp-hero-bg::after{content:"";position:absolute;top:-10%;left:50%;width:min(560px,60vw);height:min(560px,60vw);border-radius:50%;background:radial-gradient(circle,rgba(52,199,89,.22),transparent 66%);filter:blur(34px);animation:auroraDrift 16s ease-in-out infinite;pointer-events:none}
+@keyframes gridPan{from{background-position:0 0,0 0}to{background-position:48px 48px,48px 48px}}
+@keyframes auroraDrift{0%,100%{transform:translate(-54%,0) scale(1)}50%{transform:translate(-46%,5%) scale(1.16)}}
+.lp-hero-in>*{animation:heroIn .9s cubic-bezier(.2,.7,.2,1) both}
+.lp-hero-in>*:nth-child(1){animation-delay:.04s}.lp-hero-in>*:nth-child(2){animation-delay:.12s}.lp-hero-in>*:nth-child(3){animation-delay:.2s}.lp-hero-in>*:nth-child(4){animation-delay:.28s}.lp-hero-in>*:nth-child(5){animation-delay:.36s}
+@keyframes heroIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.lp-h1 i{background:linear-gradient(100deg,var(--accentDark),#5BD974,var(--accent),var(--accentDark));background-size:220% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shimmerText 6s linear infinite}
+@keyframes shimmerText{to{background-position:220% center}}
+.lp-float:hover{box-shadow:0 26px 56px rgba(26,26,24,.18)}
+.lp-cta .btn{transition:transform .25s cubic-bezier(.2,.7,.2,1),box-shadow .25s,background .2s,color .2s,border-color .2s}
+.lp-cta .btn:hover{transform:translateY(-2px)}
+.lp-cta .btn-ink:hover,.lp-cta .btn-accent:hover{box-shadow:0 14px 30px rgba(26,26,24,.22)}
+.lp-logos .ll:hover{transform:translateY(-3px) scale(1.04)}
+.offer-panel .photo{overflow:hidden}
+.offer-panel .photo img{transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.offer-panel .photo:hover img{transform:scale(1.06)}
+/* Comment ça marche — 3 étapes */
+.lp-steps{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:22px;max-width:920px;margin:8px auto 0}
+.lp-steps::before{content:"";position:absolute;top:42px;left:15%;right:15%;height:2px;background:linear-gradient(90deg,transparent,var(--accentSoft) 14%,var(--accentSoft) 86%,transparent);z-index:0}
+.lp-step{position:relative;z-index:1;text-align:center;padding:0 10px}
+.lp-step-n{width:64px;height:64px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:30px;color:var(--accentDark);background:var(--surface);border:1.5px solid var(--accentSoft);border-radius:50%;box-shadow:0 6px 18px rgba(52,199,89,.12);transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s}
+.lp-step:hover .lp-step-n{transform:translateY(-4px) scale(1.05);box-shadow:0 14px 30px rgba(52,199,89,.22)}
+.lp-step-t{font-size:17px;font-weight:600;color:var(--ink);margin:0 0 6px}
+.lp-step-d{font-size:14px;color:var(--sub);line-height:1.55;margin:0}
+/* Tarifs — aperçu sur la landing */
+.lp-prices{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:920px;margin:0 auto;align-items:stretch}
+.lp-price{position:relative;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px 22px;transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s,border-color .3s}
+.lp-price:hover{transform:translateY(-5px);box-shadow:0 20px 44px rgba(26,26,24,.10)}
+.lp-price.reco{border:1.5px solid var(--accent);box-shadow:0 16px 40px rgba(52,199,89,.16)}
+.lp-price.reco:hover{transform:translateY(-7px);box-shadow:0 26px 54px rgba(52,199,89,.22)}
+.lp-price-pop{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:12px;font-weight:600;padding:5px 13px;border-radius:999px;white-space:nowrap;box-shadow:0 6px 16px rgba(52,199,89,.32)}
+.lp-price-nom{font-size:15px;font-weight:600;color:var(--ink)}
+.lp-price-amt{display:flex;align-items:baseline;gap:5px;margin:10px 0 2px}
+.lp-price-amt b{font-family:var(--serif);font-size:46px;font-weight:400;color:var(--ink);line-height:1}
+.lp-price-amt span{font-size:19px;color:var(--ink);font-weight:500}
+.lp-price-per{font-size:13px;color:var(--sub);min-height:17px}
+.lp-price-save{display:inline-block;margin-top:9px;font-size:12px;font-weight:600;color:var(--accentDark);background:var(--accentSoft);padding:3px 9px;border-radius:999px}
+.lp-price-feats{border-top:1px solid var(--border);padding-top:16px;margin-top:16px;flex:1;display:flex;flex-direction:column;gap:9px}
+.lp-price-feats div{display:flex;gap:9px;font-size:13.5px;color:var(--text);line-height:1.45}
+.lp-price-feats .ck{color:var(--accent);flex-shrink:0}
+.lp-price .btn{width:100%;margin-top:18px}
+@media(max-width:760px){
+  .lp-steps{grid-template-columns:1fr;gap:26px;max-width:340px}
+  .lp-steps::before{display:none}
+  .lp-prices{grid-template-columns:1fr;max-width:380px}
+  .lp-price.reco{order:-1}
+}
+@media (prefers-reduced-motion: reduce){
+  .lp-hero-bg::before,.lp-hero-bg::after,.lp-float,.lp-h1 i,.lp-hero-in>*{animation:none!important}
+  .lp-h1 i{color:var(--accentDark)}
+  #lp-progress{display:none}
+}
 </style>
 </head>
 <body>
@@ -1302,10 +1415,41 @@ function setupReveals(){
     });
   },{threshold:.15,rootMargin:"0px 0px -60px 0px"});
   document.querySelectorAll(".reveal").forEach(el=>obs.observe(el));
+  // Barre de progression de scroll (handler nommé => pas de fuite entre les rendus).
+  window.removeEventListener("scroll",_lpScroll);
+  window.addEventListener("scroll",_lpScroll,{passive:true});
+  _lpScroll();
+  // Parallaxe douce des cartes flottantes (desktop, pointeur précis, hors reduced-motion).
+  const hero=document.querySelector(".lp-hero");
+  if(hero&&matchMedia("(pointer:fine)").matches&&!matchMedia("(prefers-reduced-motion: reduce)").matches){
+    hero.addEventListener("mousemove",_lpParallax);
+    hero.addEventListener("mouseleave",_lpParallaxReset);
+  }
+}
+function _lpScroll(){
+  const bar=document.getElementById("lp-progress");if(!bar)return;
+  const h=document.documentElement,max=h.scrollHeight-h.clientHeight;
+  bar.style.transform="scaleX("+(max>0?Math.min(1,h.scrollTop/max):0)+")";
+}
+function _lpParallax(e){
+  const cards=e.currentTarget.querySelectorAll(".lp-float");if(!cards.length)return;
+  const r=e.currentTarget.getBoundingClientRect();
+  const cx=(e.clientX-r.left)/r.width-.5,cy=(e.clientY-r.top)/r.height-.5;
+  cards.forEach((el,i)=>{const d=(i%2?1:-1)*(10+i*4);el.style.translate=(cx*d).toFixed(1)+"px "+(cy*d).toFixed(1)+"px";});
+}
+function _lpParallaxReset(e){
+  e.currentTarget.querySelectorAll(".lp-float").forEach(el=>el.style.translate="0px 0px");
 }
 function toggleFounder(i){
   const cards=document.querySelectorAll(".founder");
   if(cards[i])cards[i].classList.toggle("open");
+}
+function lpOffer(btn,key){
+  const seg=btn.parentElement;
+  seg.querySelectorAll("button").forEach(b=>b.classList.remove("on"));
+  btn.classList.add("on");
+  const sec=btn.closest("section")||document;
+  sec.querySelectorAll(".offer-panel").forEach(p=>p.classList.toggle("on",p.dataset.offer===key));
 }
 
 /* ===== handlers (public) ===== */
@@ -1521,33 +1665,116 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&state.pdfFullscreen
 function Landing(){
   const s=computeStats();
   const dup=TESTIMONIALS.concat(TESTIMONIALS); // doublé pour boucle infinie
-  return `<div class="fade">${Nav()}
-  <div class="hero" style="position:relative;overflow:hidden">
-    <div class="hero-glow"></div>
-    <div class="hero-img"><img src="${SITE_IMG.hero}" onerror="this.remove()"/></div>
-    <div class="wrap" style="position:relative;z-index:1;padding:88px 0 64px;max-width:760px">
-      <span class="pill">Par les étudiants, pour les étudiants</span>
-      <h1 class="serif" style="font-size:clamp(42px,6.8vw,72px);line-height:1.02;color:var(--ink);margin:20px 0 18px;letter-spacing:-1.5px">Comprendre, s'entraîner, <i style="color:var(--accentDark);font-style:italic">réussir</i>&nbsp;!</h1>
-      <p style="font-size:20px;line-height:1.55;color:var(--sub);margin:0 0 14px;max-width:600px">Cours, TD et examens corrigés — expliqués en vidéo par les majors de ta promo. Pour que chaque étudiant ait vraiment les moyens de réussir sa licence.</p>
-      <p style="font-size:16px;line-height:1.5;color:var(--accentDark);margin:0 0 30px;font-weight:500">✦ Accède à ton programme personnalisé</p>
-      <div style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn btn-ink btn-lg" onclick="nav('univs')">Choisir mon université →</button><button class="btn btn-ghost btn-lg" onclick="nav('tuteur')">Devenir tuteur</button></div>
+  const nUsers=(state.publicStats&&state.publicStats.users)||0;
+  const nContenus=(state.publicStats&&state.publicStats.contenus)||(s.cours+s.td+s.examens);
+  const nSubs=(state.publicStats&&state.publicStats.subscribers)||0;
+  // Tuteurs majors illustratifs : [initiales, nom, matière, note]
+  // Cartes flottantes du hero : on illustre le CONTENU (matières + formats), pas de faux tuteurs.
+  const floatCards=[["📊","Microéconomie","Cours · TD · Examens"],["⚖️","Droit constitutionnel","Cours · TD"],["🧮","Mathématiques","Cours · TD · Examens"],["📈","Comptabilité","Cours · Examens"]];
+  // Avatars décoratifs du badge (cercles abstraits, aucune identité inventée).
+  const badgeAvs=["linear-gradient(135deg,#5BD974,#1E8C3C)","linear-gradient(135deg,#7BE0C0,#2A9D8F)","linear-gradient(135deg,#9AD86B,#3C8C1E)","linear-gradient(135deg,#5BC8D9,#1E6C8C)"];
+  const offers={
+    Cours:{ic:"📘",lbl:"Cours",t:"Le cours, enfin clair",img:SITE_IMG.cours,d:"Les notions essentielles résumées et filmées par un major — sans remplissage, droit au but.",feats:["Les notions clés expliquées en vidéo","Définitions & formules à connaître","Les confusions fréquentes signalées","Disponible où tu veux, quand tu veux"]},
+    TD:{ic:"▶",lbl:"TD corrigés",t:"Les TD corrigés en vidéo",img:SITE_IMG.td,d:"Chaque TD repris étape par étape : tu vois la méthode, pas seulement la réponse.",feats:["La méthode avant le calcul","Résolution pas à pas, comme sur la copie","Les pièges classiques qui coûtent des points","Une variante pour t'auto-évaluer"]},
+    Examen:{ic:"📝",lbl:"Examens",t:"Les examens en conditions réelles",img:SITE_IMG.examen,d:"Les vrais sujets d'examen corrigés pour t'entraîner comme le jour J.",feats:["Sujets d'annales corrigés en vidéo","Le barème et ce qu'attend le correcteur","La stratégie de gestion du temps","Entraîne-toi avant le partiel, pas la veille"]}
+  };
+  const points=[
+    ["Les majors de ta propre promo","Chaque tuteur a réellement eu la note dans la matière qu'il explique. Pas un prof lointain : quelqu'un qui a passé le même partiel, dans la même fac, il y a peu."],
+    ["Tout est filmé, expliqué pas à pas","Cours, TD et examens : tout passe par la vidéo. Tu vois le raisonnement se construire, tu mets sur pause, tu reviens en arrière autant que tu veux."],
+    ["Un espace personnel, adapté à ton année","Tu indiques ton université, ta filière et ton niveau — Studia t'ouvre exactement le bon programme, au bon moment du calendrier universitaire."],
+    ["Un prix pensé pour le budget étudiant","Un pass semestriel sans engagement, bien plus accessible qu'une prépa privée. Tu changes ou tu résilies quand tu veux."],
+    ["Une qualité vérifiée avant publication","Chaque contenu est relu et validé. On préfère moins de vidéos, mais des vidéos réellement utiles et irréprochables."]
+  ];
+  const faqs=[
+    ["C'est pour qui exactement ?","Pour tout étudiant en licence qui veut comprendre, pas seulement réviser la veille — que tu vises la mention ou que tu cherches à te remettre à flot après un décrochage."],
+    ["Qui sont les tuteurs ?","Des majors de ta promo : des étudiants qui ont obtenu d'excellentes notes dans la matière exacte qu'ils expliquent. Chaque tuteur est sélectionné et son contenu vérifié."],
+    ["Combien ça coûte ?","Un pass semestriel pensé pour le budget étudiant, sans engagement. Tu retrouves le détail des formules sur la page Tarifs — et tu peux résilier quand tu veux."],
+    ["Comment se débloque le contenu ?","Ton espace suit le calendrier universitaire : ton année et tes semestres s'ouvrent au bon moment. Tu accèdes à ton programme, pas à un catalogue dans lequel te perdre."],
+    ["Mon université n'est pas encore là ?","On s'étend campus par campus pour garantir la qualité. Notre premier campus est déjà en ligne ; les autres facs arrivent vite. Tu peux déjà créer ton compte pour être prévenu·e."],
+    ["Je peux devenir tuteur ?","Oui ! Si tu as cartonné dans une matière, tu peux transmettre, gagner un peu d'argent et muscler ton CV. Dépose ta candidature depuis « Devenir tuteur »."]
+  ];
+  const steps=[
+    ["1","Choisis ton université","Indique ta fac, ta filière et ton année. Studia t'ouvre exactement le bon programme — pas un catalogue où te perdre."],
+    ["2","Apprends avec les majors","Cours, TD et examens filmés, expliqués pas à pas par ceux qui ont eu la note. Pause, retour arrière, à ton rythme."],
+    ["3","Réussis tes partiels","Tu arrives à l'examen avec la méthode des meilleurs, déjà entraîné·e sur les annales. Le jour J, plus de surprises."]
+  ];
+  const plans=[
+    {nom:"Découverte",amt:"0",per:"",sub:"Pour tester sans payer",feats:["2 contenus offerts","Aperçu des méthodes","Accès au programme"],cta:"Commencer gratuitement",v:"ghost",act:"nav('univs')"},
+    {nom:"Pass semestriel",amt:"39",per:"€",sub:"pour tout le semestre",save:"−15 € vs mensuel",reco:true,feats:["Accès illimité tout le semestre","Cours, TD & examens corrigés","Partiels blancs & QCM","Lives de révision avant partiels"],cta:"Choisir le semestre →",v:"ink",act:"startCheckout('semestre')"},
+    {nom:"Mensuel",amt:"9",per:"€",sub:"par mois · sans engagement",feats:["Accès illimité","Tous les contenus corrigés","Partiels blancs & QCM","Résiliable en 1 clic"],cta:"Prendre au mois",v:"ghost",act:"startCheckout('mensuel')"}
+  ];
+  return `<div class="fade"><div id="lp-progress"></div>${Nav()}
+  <section class="lp-hero">
+    <div class="lp-hero-bg"></div>
+    ${floatCards.map((c,i)=>`<div class="lp-float lp-f${i+1}"><div class="fa">${c[0]}</div><div><div class="ft">${c[1]}</div><div class="fm">${c[2]}</div></div><span class="note">▶ Vidéo</span></div>`).join("")}
+    <div class="wrap lp-hero-in">
+      <div class="lp-badge"><div class="lp-avs">${badgeAvs.map(g=>`<span style="background:${g}"></span>`).join("")}</div><span style="display:inline-flex;align-items:center;gap:7px"><span style="color:#F5A623;letter-spacing:1px">★★★★★</span> Adoré par la 1re promo${nUsers>0?` · +${nUsers} inscrits`:""}</span></div>
+      <h1 class="lp-h1">Comprendre, s'entraîner,<br/><i>réussir</i> sa licence.</h1>
+      <p class="lp-sub">Cours, TD et examens corrigés — expliqués en vidéo par les majors de ta promo. La méthode des meilleurs, à portée de tous.</p>
+      <div class="lp-cta"><button class="btn btn-ink btn-lg" onclick="nav('univs')">Choisir mon université →</button><button class="btn btn-ghost btn-lg" onclick="nav('tarifs')">Voir les tarifs</button></div>
+      <div class="lp-trust"><span>✦ Sans engagement</span><span>✦ Accès immédiat</span><span>✦ Pensé pour le budget étudiant</span></div>
     </div>
-  </div>
+  </section>
   <div class="wrap">
 
-    <section class="sec reveal" style="border:none;padding:30px 0 50px">
+    <section class="sec reveal" style="border:none;padding:22px 0 4px">
+      <p style="text-align:center;font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin:0 0 22px">Déjà en ligne · bientôt dans toute la France</p>
+      <div class="lp-logos">
+        ${["uca","p1","assas","dauphine","lyon","amu","tse","bordeaux","nantes"].map(id=>`<div class="ll"><img loading="lazy" src="${UNIV_LOGOS[id]}" alt="${id}" onerror="this.parentElement.style.display='none'"/></div>`).join("")}
+      </div>
+    </section>
+
+    <section class="sec reveal" style="border:none;padding-top:34px">
       <div class="stats-band">
         <div class="stats-grid">
-          <div class="stat reveal" data-counter="${(state.publicStats&&state.publicStats.contenus)||s.cours+s.td+s.examens}"><span class="stat-num">0</span><div class="stat-label">Contenus publiés</div></div>
-          <div class="stat reveal" data-counter="${(state.publicStats&&state.publicStats.users)||0}"><span class="stat-num">0</span><div class="stat-label">Étudiants inscrits</div></div>
-          <div class="stat reveal" data-counter="${(state.publicStats&&state.publicStats.subscribers)||0}"><span class="stat-num">0</span><div class="stat-label">Abonnés actifs</div></div>
+          <div class="stat reveal" data-counter="${nContenus}"><span class="stat-num">0${nContenus>0?'<span class="stat-suffix">+</span>':''}</span><div class="stat-label">Contenus publiés</div></div>
+          <div class="stat reveal" data-counter="${nUsers}"><span class="stat-num">0${nUsers>0?'<span class="stat-suffix">+</span>':''}</span><div class="stat-label">Étudiants inscrits</div></div>
+          <div class="stat reveal" data-counter="${nSubs}"><span class="stat-num">0${nSubs>0?'<span class="stat-suffix">+</span>':''}</span><div class="stat-label">Abonnés actifs</div></div>
           <div class="stat reveal" data-counter="${s.heures}"><span class="stat-num">0<span class="stat-suffix">h</span></span><div class="stat-label">de vidéo</div></div>
         </div>
       </div>
     </section>
 
-    <section class="sec reveal" style="border:none;padding-top:24px">
-      <span class="eyebrow">Les écoles déjà sur Studia</span>
+    <section class="sec reveal">
+      <div style="text-align:center">
+        <span class="eyebrow">Comment ça marche</span>
+        <h2 class="sec-title">Trois étapes, zéro galère.</h2>
+        <p class="sec-lead" style="margin:0 auto 34px">De ton inscription à la réussite de tes partiels, on a balisé tout le chemin.</p>
+      </div>
+      <div class="lp-steps">
+        ${steps.map((st,i)=>`<div class="lp-step reveal" style="transition-delay:${i*90}ms">
+          <div class="lp-step-n">${st[0]}</div>
+          <h3 class="lp-step-t">${st[1]}</h3>
+          <p class="lp-step-d">${st[2]}</p>
+        </div>`).join("")}
+      </div>
+    </section>
+
+    <section class="sec reveal">
+      <div style="text-align:center">
+        <span class="eyebrow">Ce que tu trouveras</span>
+        <h2 class="sec-title">Un accompagnement complet, pour chaque épreuve.</h2>
+        <p class="sec-lead" style="margin:0 auto 26px">Cours, TD, examens : un format pensé pour chaque moment de ton semestre.</p>
+      </div>
+      <div style="display:flex;justify-content:center;margin-bottom:30px"><div class="seg">
+        ${Object.entries(offers).map(([k,o],i)=>`<button class="${i===0?'on':''}" onclick="lpOffer(this,'${k}')">${o.ic} ${o.lbl}</button>`).join("")}
+      </div></div>
+      <div class="offer-panels">
+        ${Object.entries(offers).map(([k,o],i)=>`<div class="offer-panel ${i===0?'on':''}" data-offer="${k}">
+          <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:34px;align-items:center;border:none">
+            <div>
+              <h3 style="font-family:var(--serif);font-size:28px;color:var(--ink);margin:0 0 10px;letter-spacing:-.5px">${o.t}</h3>
+              <p style="font-size:15.5px;color:var(--sub);line-height:1.6;margin:0 0 16px">${o.d}</p>
+              <div>${o.feats.map(f=>`<div class="offer-feat"><span class="ck">✓</span><span style="font-size:14.5px;color:var(--text);line-height:1.5">${f}</span></div>`).join("")}</div>
+            </div>
+            <div class="photo" style="aspect-ratio:4/3;border-radius:16px"><img loading="lazy" src="${o.img}" onerror="this.remove()"/></div>
+          </div>
+        </div>`).join("")}
+      </div>
+    </section>
+
+    <section class="sec reveal">
+      <span class="eyebrow">Les campus sur Studia</span>
       <h2 class="sec-title">On s'étend campus par campus.</h2>
       <p class="sec-lead">Chaque école dispose de ses propres tuteurs majors. On vérifie la qualité avant publication.</p>
       <div class="seg" style="margin-bottom:24px">
@@ -1563,37 +1790,93 @@ function Landing(){
     </section>
 
     <section class="sec reveal">
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px;align-items:center;border:none">
-        <div><span class="eyebrow">Notre mission</span><h2 class="sec-title" style="margin-bottom:14px">Le savoir doit circuler.</h2><p style="font-size:17px;color:var(--sub);line-height:1.65;margin:0">Trop d'étudiants décrochent faute d'explications claires, et non faute de travail. <b style="color:var(--ink);font-weight:600">Studia met les meilleurs étudiants à votre service&nbsp;!</b></p></div>
-        <div class="photo" style="aspect-ratio:4/3;border-radius:14px"><img loading="lazy" src="${SITE_IMG.mission}" onerror="this.remove()"/></div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:48px;align-items:start;border:none">
+        <div class="lp-why-left">
+          <span class="eyebrow">Pourquoi Studia</span>
+          <h2 class="sec-title">Bien plus qu'une banque de cours.</h2>
+          <p style="font-size:16px;color:var(--sub);line-height:1.65;margin:0 0 24px">Trop d'étudiants décrochent faute d'explications claires — et non faute de travail. On met les meilleurs étudiants à ton service.</p>
+          <div class="photo" style="aspect-ratio:4/3;border-radius:16px"><img loading="lazy" src="${SITE_IMG.mission}" onerror="this.remove()"/></div>
+        </div>
+        <div class="acc">
+          ${points.map(([q,a],i)=>`<div class="acc-item ${i===0?'open':''}">
+            <button class="acc-q" onclick="this.parentElement.classList.toggle('open')"><span>${q}</span><span class="acc-ic">⌄</span></button>
+            <div class="acc-a"><div class="acc-a-min"><div>${a}</div></div></div>
+          </div>`).join("")}
+        </div>
       </div>
     </section>
 
     <section class="sec reveal">
-      <span class="eyebrow">Ils ont décroché grâce à Studia</span>
-      <h2 class="sec-title">Ce qu'en disent les étudiants.</h2>
-      <p class="sec-lead">Témoignages issus de notre première promo Côte d'Azur.</p>
+      <div style="text-align:center">
+        <span class="eyebrow">Le réseau de tuteurs</span>
+        <h2 class="sec-title">Tes tuteurs sont les majors de ta promo.</h2>
+        <p class="sec-lead" style="margin:0 auto 30px">On démarre à deux, majors de notre promo à l'UCA — et on recrute les meilleurs, matière par matière. La prochaine recrue, c'est peut-être toi.</p>
+      </div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));max-width:760px;margin:0 auto">
+        ${FOUNDERS.map((f,i)=>`<div class="major-card reveal" style="transition-delay:${i*90}ms">
+          <div class="major-av"><img loading="lazy" src="${ASSET(f.photo)}" alt="${esc(f.nom)}" onerror="this.parentElement.textContent='${f.initiales}'"/></div>
+          <div style="font-weight:600;color:var(--ink);font-size:15.5px">${f.nom}</div>
+          <div style="font-size:13px;color:var(--sub);margin-top:2px">${f.role} · UCA</div>
+          <div class="major-note">${f.tags[1]||"Économie & Gestion"}</div>
+        </div>`).join("")}
+        <div class="major-card major-join reveal" style="transition-delay:${FOUNDERS.length*90}ms" onclick="nav('tuteur')">
+          <div class="major-av major-av-join">+</div>
+          <div style="font-weight:600;color:var(--ink);font-size:15.5px">Et toi&nbsp;?</div>
+          <div style="font-size:13px;color:var(--sub);margin-top:2px">Tu as cartonné dans une matière</div>
+          <div class="major-note" style="background:var(--ink);color:#fff">Devenir tuteur →</div>
+        </div>
+      </div>
     </section>
   </div>
-  <div class="marquee reveal" style="margin-bottom:60px">
+
+  <div class="wrap"><section class="sec reveal" style="border:none;padding-bottom:16px;text-align:center">
+    <span class="eyebrow">Ils ont décroché grâce à Studia</span>
+    <h2 class="sec-title">Ce qu'en disent les étudiants.</h2>
+  </section></div>
+  <div class="marquee reveal" style="margin-bottom:30px">
     <div class="marquee-track">
       ${dup.map(([q,n,m])=>`<div class="testimonial"><div class="testimonial-stars">★★★★★</div><p class="testimonial-quote">« ${q} »</p><div class="testimonial-author"><div class="testimonial-avatar">${n.split(" ").map(x=>x[0]).join("")}</div><div><div class="testimonial-name">${n}</div><div class="testimonial-meta">${m}</div></div></div></div>`).join("")}
     </div>
   </div>
-  <div class="wrap">
 
+  <div class="wrap">
     <section class="sec reveal">
-      <span class="eyebrow">Ce que tu trouveras</span>
-      <h2 class="sec-title" style="margin-bottom:28px">Tout ce dont tu as besoin pour ta licence.</h2>
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
-        ${[["cours","Cours","Les notions essentielles résumées et filmées, sans remplissage."],["td","TD corrigés","Chaque TD repris en vidéo, étape par étape, avec les pièges signalés."],["examen","Examens corrigés","Les sujets d'examen corrigés pour t'entraîner en conditions réelles."]].map(([key,t,d])=>`<div class="card" style="overflow:hidden"><div class="photo" style="aspect-ratio:16/9"><img loading="lazy" src="${SITE_IMG[key]}" onerror="this.remove()"/></div><div style="padding:20px"><h3 style="font-size:18px;color:var(--ink);font-weight:600;margin:0 0 8px">${t}</h3><p style="font-size:14px;color:var(--sub);line-height:1.6;margin:0">${d}</p></div></div>`).join("")}
+      <div style="text-align:center">
+        <span class="eyebrow">Tarifs étudiants</span>
+        <h2 class="sec-title">Un prix pensé pour ton budget.</h2>
+        <p class="sec-lead" style="margin:0 auto 34px">Sans engagement caché, bien moins qu'une prépa privée. Tu changes ou tu résilies quand tu veux.</p>
+      </div>
+      <div class="lp-prices">
+        ${plans.map(p=>`<div class="lp-price${p.reco?' reco':''} reveal">
+          ${p.reco?'<div class="lp-price-pop">★ Le + populaire</div>':''}
+          <div class="lp-price-nom">${p.nom}</div>
+          <div class="lp-price-amt"><b>${p.amt}</b>${p.per?`<span>${p.per}</span>`:''}</div>
+          <div class="lp-price-per">${p.sub}</div>
+          ${p.save?`<span class="lp-price-save">${p.save}</span>`:''}
+          <div class="lp-price-feats">
+            ${p.feats.map(f=>`<div><span class="ck">✓</span><span>${f}</span></div>`).join("")}
+          </div>
+          <button class="btn btn-${p.v}" onclick="${p.act}">${p.cta}</button>
+        </div>`).join("")}
+      </div>
+      <div style="text-align:center;margin-top:24px">
+        <a onclick="nav('tarifs')" style="cursor:pointer;font-size:14px;font-weight:500;color:var(--accentDark)">Voir le détail des formules →</a>
       </div>
     </section>
+  </div>
 
+  <div class="wrap">
     <section class="sec reveal">
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:40px;border:none">
-        <div><span class="eyebrow">Pour qui ?</span><h2 class="sec-title">Tu te reconnais ?</h2></div>
-        <div>${["L'étudiant qui veut comprendre, pas seulement réviser la veille.","Celui qui a décroché en cours d'année et veut se remettre à flot.","Celui qui vise la mention et veut la méthode des meilleurs.","Le major qui veut transmettre, gagner un peu d'argent et muscler son CV."].map(s=>`<div style="display:flex;gap:10px;font-size:15px;color:var(--text);line-height:1.5;margin-bottom:14px"><span style="color:var(--accent);font-size:18px;line-height:1">✓</span>${s}</div>`).join("")}</div>
+      <div style="text-align:center">
+        <span class="eyebrow">Des questions ?</span>
+        <h2 class="sec-title">On te répond.</h2>
+        <p class="sec-lead" style="margin:0 auto 8px">Tout ce qu'il faut savoir avant de te lancer.</p>
+      </div>
+      <div class="acc" style="max-width:760px;margin:18px auto 0">
+        ${faqs.map(([q,a])=>`<div class="acc-item">
+          <button class="acc-q" onclick="this.parentElement.classList.toggle('open')"><span>${q}</span><span class="acc-ic">⌄</span></button>
+          <div class="acc-a"><div class="acc-a-min"><div><div class="faq-bubble"><span class="fb-av">S</span><span>${a}</span></div></div></div></div>
+        </div>`).join("")}
       </div>
     </section>
 
@@ -1620,7 +1903,7 @@ function Landing(){
     </section>
 
     <section class="sec reveal" style="border:none">
-      <div class="card" style="background:var(--ink);border:none;padding:52px 32px;text-align:center;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 80% 0%,rgba(52,199,89,.22),transparent 60%);pointer-events:none"></div><div style="position:relative"><h2 class="serif" style="font-size:clamp(30px,4vw,42px);color:#fff;margin:0 0 10px;letter-spacing:-.5px">Trouve ton université et rejoins-nous&nbsp;!</h2><p style="font-size:16px;color:rgba(255,255,255,.7);margin:0 0 26px">Université, filière, niveau — et accède à tout le programme.</p><button class="btn btn-accent btn-lg" onclick="nav('univs')">Choisir mon université →</button></div></div>
+      <div class="card" style="background:var(--ink);border:none;padding:56px 32px;text-align:center;position:relative;overflow:hidden"><div style="position:absolute;inset:0;background:radial-gradient(circle at 80% 0%,rgba(52,199,89,.24),transparent 60%),radial-gradient(circle at 10% 100%,rgba(52,199,89,.14),transparent 55%);pointer-events:none"></div><div style="position:relative"><h2 class="serif" style="font-size:clamp(30px,4vw,46px);color:#fff;margin:0 0 12px;letter-spacing:-.5px">Prêt à réussir ta licence&nbsp;?</h2><p style="font-size:16px;color:rgba(255,255,255,.72);margin:0 auto 28px;max-width:480px">Université, filière, niveau — et tu accèdes à tout ton programme, expliqué par les majors.</p><div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><button class="btn btn-accent btn-lg" onclick="nav('univs')">Choisir mon université →</button><button class="btn btn-lg" style="background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2)" onclick="nav('tuteur')">Devenir tuteur</button></div></div></div>
     </section>
   </div>
   ${Footer()}</div>`;
