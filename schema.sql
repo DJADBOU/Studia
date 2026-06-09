@@ -486,3 +486,96 @@ create policy "documents_user_select" on storage.objects
 
 -- Recharge le cache de schéma PostgREST (sinon erreurs PGRST204 sur les nouvelles colonnes)
 notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- 12) CATÉGORIES (RUBRIQUES) PAR MATIÈRE
+--     Avant : une seule table globale `categories` (id, label, icon, position)
+--             => les mêmes onglets (Cours, TD, Examen…) pour TOUTES les matières.
+--     Après : chaque matière a SES propres rubriques. Ce qui est demandé en
+--             droit n'est pas ce qui est demandé en éco-gestion.
+--     Clé : (univ, faculte, annee, matiere, cat_id). `cat_id` est la valeur
+--           stockée dans contenus.type. Une matière sans rubrique => aucun onglet.
+--     À exécuter tel quel : idempotent (sûr à relancer).
+-- ============================================================================
+
+-- 12.a) Si l'ancienne table globale existe encore (colonne `id`, pas de `matiere`),
+--       on la renomme pour récupérer ses libellés/icônes lors du backfill.
+do $$
+begin
+  if exists (
+        select 1 from information_schema.columns
+        where table_schema='public' and table_name='categories' and column_name='id'
+      )
+     and not exists (
+        select 1 from information_schema.columns
+        where table_schema='public' and table_name='categories' and column_name='matiere'
+      )
+  then
+    -- on la sort d'abord de la publication realtime si elle y est
+    begin
+      alter publication supabase_realtime drop table categories;
+    exception when others then null;
+    end;
+    alter table categories rename to categories_global_old;
+  end if;
+end $$;
+
+-- 12.b) Nouvelle table scopée par matière.
+create table if not exists categories (
+  univ     text not null,
+  faculte  text not null,
+  annee    text not null,
+  matiere  text not null,
+  cat_id   text not null,                 -- valeur stockée dans contenus.type (ex. 'Cours')
+  label    text not null,
+  icon     text default '📄',
+  position int  default 0,
+  primary key (univ, faculte, annee, matiere, cat_id)
+);
+
+-- 12.c) Backfill : chaque matière récupère EXACTEMENT les rubriques que son
+--       contenu utilise déjà, pour que rien ne disparaisse après migration.
+--       Les libellés/icônes proviennent de l'ancienne table globale si dispo.
+do $$
+begin
+  if exists (select 1 from information_schema.tables
+             where table_schema='public' and table_name='categories_global_old') then
+    insert into categories (univ, faculte, annee, matiere, cat_id, label, icon, position)
+    select distinct c.univ, c.faculte, c.annee, c.matiere, c.type,
+           coalesce(g.label, c.type), coalesce(g.icon, '📄'), coalesce(g.position, 0)
+    from contenus c
+    left join categories_global_old g on g.id = c.type
+    where c.type is not null and c.univ is not null and c.faculte is not null
+      and c.annee is not null and c.matiere is not null
+    on conflict do nothing;
+  else
+    insert into categories (univ, faculte, annee, matiere, cat_id, label, icon, position)
+    select distinct c.univ, c.faculte, c.annee, c.matiere, c.type,
+           c.type, '📄', 0
+    from contenus c
+    where c.type is not null and c.univ is not null and c.faculte is not null
+      and c.annee is not null and c.matiere is not null
+    on conflict do nothing;
+  end if;
+end $$;
+
+-- 12.d) RLS : lecture publique (les onglets sont visibles par tous), écriture admin only.
+alter table categories enable row level security;
+
+drop policy if exists categories_read on categories;
+create policy categories_read on categories
+  for select using (true);
+
+drop policy if exists categories_admin_write on categories;
+create policy categories_admin_write on categories
+  for all using (is_admin()) with check (is_admin());
+
+-- 12.e) Realtime : pour que l'ajout/suppression d'une rubrique se propage en direct.
+do $$
+begin
+  alter publication supabase_realtime add table categories;
+exception when duplicate_object then null; when others then null;
+end $$;
+
+-- Recharge le cache de schéma PostgREST
+notify pgrst, 'reload schema';

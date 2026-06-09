@@ -583,16 +583,22 @@ async function loadCategories(){
   if(!sb)return;
   try{
     const{data,error}=await sb.from("categories").select("*").order("position");
-    if(!error&&data&&data.length){state.categories=data;safeRender();}
+    if(!error&&data){
+      // on n'accepte que le nouveau schéma scopé (cat_id + matiere). Les lignes de l'ancienne
+      // table globale (sans matiere) sont ignorées tant que la migration SQL n'a pas tourné.
+      state.categories=data.filter(r=>r.cat_id!=null&&r.matiere!=null).map(r=>({univ:r.univ,faculte:r.faculte,annee:r.annee,matiere:r.matiere,id:r.cat_id,label:r.label,icon:r.icon,position:r.position}));
+      safeRender();
+    }
   }catch(e){console.warn("loadCategories:",e.message);}
 }
 async function dbUpsertCategory(c){
   if(!sb)return{ok:false};
-  try{const{error}=await sb.from("categories").upsert(c);if(error){toast("Échec : "+error.message,"err");return{ok:false};}toast("✓ Catégorie sauvegardée","ok");return{ok:true};}catch(e){return{ok:false};}
+  const row={univ:c.univ,faculte:c.faculte,annee:c.annee,matiere:c.matiere,cat_id:c.id,label:c.label,icon:c.icon,position:c.position};
+  try{const{error}=await sb.from("categories").upsert(row,{onConflict:"univ,faculte,annee,matiere,cat_id"});if(error){toast("Échec : "+error.message,"err");return{ok:false};}toast("✓ Rubrique sauvegardée","ok");return{ok:true};}catch(e){return{ok:false};}
 }
-async function dbDeleteCategory(id){
+async function dbDeleteCategory(s){
   if(!sb)return;
-  try{const{error}=await sb.from("categories").delete().eq("id",id);if(error){toast(error.message,"err");return;}toast("Catégorie supprimée","ok");}catch(e){}
+  try{const{error}=await sb.from("categories").delete().eq("univ",s.univ).eq("faculte",s.faculte).eq("annee",s.annee).eq("matiere",s.matiere).eq("cat_id",s.id);if(error){toast(error.message,"err");return;}toast("Rubrique supprimée","ok");}catch(e){}
 }
 function defaultIconFor(id){const ic={cours:"📘",td:"▶",midterm:"🗒",examen:"📝",partiel:"📋",methode:"💡",annale:"📂"};return ic[(id||"").toLowerCase()]||"📄";}
 async function restoreSession(){if(!sb)return;try{await loadAdmins();const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=isAdminEmail(data.user.email);state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;showDbStatus(true);render();await checkSubscription();await loadProfile();await loadBookmarks();if(!isAdmin)loadMyApplication();render();maybeShowOnboarding();}}catch(e){}}
@@ -831,7 +837,7 @@ function renderContribute(){
         <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Matière *</label>
           <input id="cbMatiere" class="input" placeholder="Ex. Microéconomie" value="${esc(cf.matiere||"")}"/></div>
         <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Type</label>
-          <select id="cbType" style="${sel}">${typeIds().map(t=>`<option value="${t}">${esc(labelFor(t))}</option>`).join("")}</select></div>
+          <select id="cbType" style="${sel}">${globalCats().map(t=>`<option value="${t.id}">${esc(t.label)}</option>`).join("")}</select></div>
       </div>
       <div><label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Titre *</label>
         <input id="cbTitre" class="input" placeholder="Ex. Fiche de révision chapitre 3" value="${esc(cf.titre||"")}"/></div>
@@ -1166,10 +1172,26 @@ const DEFAULT_CATEGORIES=[
   {id:"Examen",label:"Examen final",icon:"📝",position:4}
 ];
 const TUTEURS=[["Léa M.","18"],["Karim B.","17"],["Yanis T.","16"],["Sofia R.","17"]];
-function typeIds(){return (state.categories&&state.categories.length?state.categories:DEFAULT_CATEGORIES).map(c=>c.id);}
-function allCategories(){return state.categories&&state.categories.length?state.categories:DEFAULT_CATEGORIES;}
-function labelFor(id){const c=allCategories().find(x=>x.id===id);return c?c.label:(id||"—");}
-function iconFor(id){const c=allCategories().find(x=>x.id===id);return c?c.icon:"📄";}
+// Rubriques PAR MATIÈRE. state.categories = toutes les lignes {univ,faculte,annee,matiere,id,label,icon,position}.
+// Une matière sans rubrique => aucun onglet ("rien tant que non défini").
+function catsFor(univ,faculte,annee,matiere){
+  return (state.categories||[])
+    .filter(c=>c.univ===univ&&c.faculte===faculte&&c.annee===annee&&c.matiere===matiere)
+    .sort((a,b)=>(a.position||0)-(b.position||0)||(a.id>b.id?1:-1));
+}
+// Liste globale dédupliquée par id — uniquement pour "Proposer un document" (matière libre)
+// et comme dictionnaire de secours. JAMAIS utilisée comme onglets d'une matière.
+function globalCats(){
+  const seen=new Map();
+  (state.categories||[]).forEach(c=>{if(!seen.has(c.id))seen.set(c.id,{id:c.id,label:c.label,icon:c.icon,position:c.position||0});});
+  if(!seen.size)return DEFAULT_CATEGORIES.slice();
+  return [...seen.values()].sort((a,b)=>(a.position||0)-(b.position||0));
+}
+function _catLookup(id){return (state.categories||[]).find(x=>x.id===id)||DEFAULT_CATEGORIES.find(x=>x.id===id);}
+function labelFor(id){if(!id)return "—";const c=_catLookup(id);return c?c.label:id;}
+function iconFor(id){if(!id)return "📄";const c=_catLookup(id);return c?c.icon:"📄";}
+function _scopeKey(univ,faculte,annee,matiere){return [univ,faculte,annee,matiere].join("|");}
+function _parseScope(sc){const p=sc.split("|");return{univ:p[0],faculte:p[1],annee:p[2],matiere:p.slice(3).join("|")};}
 // Icône intelligente basée sur le média réel : vidéo si URL vidéo, PDF si fichier, sinon icône de catégorie
 function smartIcon(c){if(!c)return "📄";const hasVideo=!!(c.video_url||c.video_corrige_url);const hasFile=!!(c.file_path||c.corrige_path);if(hasVideo&&hasFile)return "🎬";if(hasVideo)return "▶";if(hasFile)return "📄";return iconFor(c.type);}
 
@@ -1315,43 +1337,40 @@ function selectFaculte(fid){
   state.semestre=acc?acc.semester:(state.profile&&state.profile.semestre)||"S1";
   state.view="programme";render();
 }
+function lockToast(annee,sem){
+  const acc=myAccess();const msg=acc?acc.lockReason(annee,sem):"";
+  toast(msg||`${annee} n'est pas accessible`,"warn",3400);
+}
 function pickAnnee(a){
-  // Lock : étudiant non-admin → bloque les années non encore débloquées (calendrier)
-  if(!canAccess(a,state.semestre||"S1")){
-    const acc=myAccess();const nu=acc&&acc.nextUnlock(a,state.semestre||"S1");
-    toast(nu?`${a} s'ouvrira en ${nu}`:`${a} n'est pas encore accessible`,"warn",3200);
-    return;
-  }
+  // Lock : étudiant non-admin → seule l'année en cours est accessible
+  if(!canAccess(a,state.semestre||"S1")){lockToast(a,state.semestre||"S1");return;}
   state.annee=a;render();
 }
 function pickMcAnnee(a){
-  if(!canAccess(a,state.semestre||"S1")){
-    const acc=myAccess();const nu=acc&&acc.nextUnlock(a,state.semestre||"S1");
-    toast(nu?`${a} s'ouvrira en ${nu}`:`${a} n'est pas encore accessible`,"warn",3200);
-    return;
-  }
+  if(!canAccess(a,state.semestre||"S1")){lockToast(a,state.semestre||"S1");return;}
   state.mcAnnee=a;render();
 }
 function pickSemestre(s,annee){
   annee=annee||state.annee||state.mcAnnee||(state.profile&&state.profile.annee)||"L1";
-  if(!canAccess(annee,s)){
-    const acc=myAccess();const nu=acc&&acc.nextUnlock(annee,s);
-    toast(nu?`Le semestre ${s} s'ouvrira en ${nu}`:`${s} n'est pas encore accessible`,"warn",3200);
-    return;
-  }
+  if(!canAccess(annee,s)){lockToast(annee,s);return;}
   state.semestre=s;render();
 }
 // Boutons « segments » année/semestre avec verrou visuel selon le calendrier universitaire
 function anneeSegHTML(currentAnnee,picker){
-  return ["L1","L2","L3"].map(y=>{const locked=!canAccess(y,state.semestre||"S1");return `<button class="${currentAnnee===y?"on":""}${locked?" locked":""}" onclick="${picker}('${y}')"${locked?' title="Pas encore débloqué"':""}>${y}${locked?" 🔒":""}</button>`;}).join("");
+  const acc=myAccess();
+  return ["L1","L2","L3"].map(y=>{const locked=!canAccess(y,state.semestre||"S1");const t=locked&&acc?acc.lockReason(y,state.semestre||"S1"):"";return `<button class="${currentAnnee===y?"on":""}${locked?" locked":""}" onclick="${picker}('${y}')"${t?` title="${esc(t)}"`:""}>${y}${locked?" 🔒":""}</button>`;}).join("");
 }
 function semSegHTML(currentSem,annee){
-  return ["S1","S2"].map(s=>{const locked=!canAccess(annee||"L1",s);return `<button class="${currentSem===s?"on":""}${locked?" locked":""}" onclick="pickSemestre('${s}','${annee||""}')"${locked?' title="Pas encore débloqué"':""}>${s}${locked?" 🔒":""}</button>`;}).join("");
+  const acc=myAccess();
+  return ["S1","S2"].map(s=>{const locked=!canAccess(annee||"L1",s);const t=locked&&acc?acc.lockReason(annee||"L1",s):"";return `<button class="${currentSem===s?"on":""}${locked?" locked":""}" onclick="pickSemestre('${s}','${annee||""}')"${t?` title="${esc(t)}"`:""}>${s}${locked?" 🔒":""}</button>`;}).join("");
 }
-function openMatiere(m){if(m==null||m==="")return;state.matiere=m;state.tab=(allCategories()[0]||{id:"Cours"}).id;state.view="matiere";render();}
+function openMatiere(m){if(m==null||m==="")return;state.matiere=m;const cats=catsFor(state.univ.id,state.faculte.id,state.annee,m);state.tab=(cats[0]||{}).id||null;state.view="matiere";render();}
 function setTab(t){state.tab=t;render();}
 async function openItem(id){
   const c=state.contenus.find(x=>x.id===id);if(!c)return;
+  // Verrouillage strict : un étudiant n'ouvre que les contenus de son année/semestre en cours
+  // (admins et visiteurs sans profil ne sont jamais bloqués). Couvre recherche, favoris, reprise, lien direct.
+  if(!canAccess(c.annee,c.semestre||"S1")){lockToast(c.annee,c.semestre||"S1");return;}
   disposePDF();
   state.item=c;state.view="detail";state.mediaTab="sujet";state.comments=[];
   render();
@@ -1660,9 +1679,8 @@ function studentAccess(profile,now){
   function allowed(annee,sem){
     const ai=LEVELS.indexOf(annee);
     if(ai<0)return true;            // type inconnu (Master, etc.) → on ne bloque pas
-    if(ai<curIdx)return true;       // années passées : tout ouvert
-    if(ai>curIdx)return false;      // années futures : verrouillées
-    if((sem||"S1")==="S2")return s2Unlocked; // année courante : S2 selon calendrier
+    if(ai!==curIdx)return false;    // STRICT : seule l'année EN COURS est accessible (ni avant, ni après)
+    if((sem||"S1")==="S2")return s2Unlocked; // année courante : S2 selon le calendrier
     return true;
   }
   // Date lisible de la prochaine ouverture (pour message UI).
@@ -1675,9 +1693,19 @@ function studentAccess(profile,now){
       const yearsToWait=ai-curIdx;
       return `septembre ${curAY+yearsToWait}`;
     }
-    return null;
+    return null; // année passée : pas de date (n'est plus dans le cursus courant)
   }
-  return {levelIdx:curIdx, level:LEVELS[curIdx], semester:curSem, s2Unlocked, allowed, nextUnlock};
+  // Message lisible expliquant POURQUOI un niveau est verrouillé.
+  function lockReason(annee,sem){
+    const ai=LEVELS.indexOf(annee);
+    if(ai<0||allowed(annee,sem))return "";
+    if(ai<curIdx)return `Tu es en ${LEVELS[curIdx]} — le ${annee} n'est plus dans ton année en cours.`;
+    if(ai>curIdx){const nu=nextUnlock(annee,sem);return nu?`${annee} s'ouvrira en ${nu}.`:`${annee} n'est pas encore accessible.`;}
+    // même année, S2 pas encore ouvert
+    const nu=nextUnlock(annee,sem);
+    return nu?`Le semestre 2 s'ouvrira en ${nu}.`:`${sem||"S2"} n'est pas encore accessible.`;
+  }
+  return {levelIdx:curIdx, level:LEVELS[curIdx], semester:curSem, s2Unlocked, allowed, nextUnlock, lockReason};
 }
 // Accès de l'étudiant connecté (null si admin ou pas de profil → pas de limite).
 function myAccess(){
@@ -1766,8 +1794,10 @@ function MyCoursesView(){
   if(!u||!f){
     return `<div class="wrap fade"><div class="page-content"><h1>Filière introuvable.</h1><button class="btn btn-ghost" onclick="goProfile()">Modifier mon profil</button></div></div>`;
   }
-  const annee=state.mcAnnee||p.annee||"L1";
-  const sem=state.semestre||"S1";
+  // Par défaut on ouvre sur le niveau RÉELLEMENT accessible (calendrier), pas l'année d'inscription figée.
+  const _acc=myAccess();
+  const annee=state.mcAnnee||(_acc?_acc.level:(p.annee||"L1"));
+  const sem=state.semestre||(_acc?_acc.semester:"S1");
   const mats=matieresFor(p.univ,p.faculte,annee,sem);
   const allContenusFilière=state.contenus.filter(c=>c.univ===p.univ&&c.faculte===p.faculte&&c.annee===annee&&semestreMatch(c,sem));
   const recentUploads=allContenusFilière.filter(c=>c.source==="upload").sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,4);
@@ -1813,9 +1843,9 @@ function MyCoursesView(){
     </div>
 
     ${mats.length?`<div class="mat-grid" style="margin-bottom:36px">
-      ${mats.map(m=>{const cats=allCategories();const counts=cats.map(c=>({c,n:countMat(p.univ,p.faculte,annee,m,c.id,sem)}));const total=counts.reduce((s,x)=>s+x.n,0);return `<div class="matiere-card" onclick="goMatiereStudent('${esc(m).replace(/'/g,"\\'")}')">
+      ${mats.map(m=>{const counts=catsFor(p.univ,p.faculte,annee,m).map(c=>({c,n:countMat(p.univ,p.faculte,annee,m,c.id,sem)}));const total=counts.reduce((s,x)=>s+x.n,0);return `<div class="matiere-card" onclick="goMatiereStudent('${esc(m).replace(/'/g,"\\'")}')">
         <div class="mc-top"><h3>${esc(m)}</h3><span class="mc-total">${total?total+" doc"+(total>1?"s":""):"À venir"}</span></div>
-        <div class="mc-chips">${counts.map(({c,n})=>`<span class="mc-chip ${n?"":"zero"}" title="${esc(c.label)}">${c.icon} <b>${n}</b></span>`).join("")}</div>
+        <div class="mc-chips">${counts.length?counts.map(({c,n})=>`<span class="mc-chip ${n?"":"zero"}" title="${esc(c.label)}">${c.icon} <b>${n}</b></span>`).join(""):'<span class="mc-chip zero">À venir</span>'}</div>
       </div>`;}).join("")}
     </div>`:`<div class="card" style="padding:48px;text-align:center;color:var(--muted);margin-bottom:36px">Aucune matière publiée en ${annee} pour ${esc(f.nom)} pour l'instant. Reviens bientôt — l'équipe Studia ajoute du contenu chaque semaine.</div>`}
 
@@ -1845,7 +1875,9 @@ function goMyCourses(){
 }
 function goMatiereStudent(matiere){
   const p=state.profile;if(!p)return;
-  state.univ=univById(p.univ);state.faculte=facById(p.univ,p.faculte);state.annee=state.mcAnnee||p.annee||"L1";state.matiere=matiere;state.tab=(allCategories()[0]||{id:"Cours"}).id;state.view="matiere";render();
+  const annee=state.mcAnnee||p.annee||"L1";
+  state.univ=univById(p.univ);state.faculte=facById(p.univ,p.faculte);state.annee=annee;state.matiere=matiere;
+  const cats=catsFor(p.univ,p.faculte,annee,matiere);state.tab=(cats[0]||{}).id||null;state.view="matiere";render();
 }
 function openItemFromMyCourses(id){
   const c=state.contenus.find(x=>x.id===id);if(!c)return;
@@ -1867,9 +1899,9 @@ function Programme(){
       <div class="seg">${semSegHTML(sem,a)}</div>
     </div>
     ${mats.length?`<div class="mat-grid">
-      ${mats.map(m=>{const counts=allCategories().map(c=>({c,n:countMat(uid,fid,a,m,c.id,sem)}));const total=counts.reduce((s,x)=>s+x.n,0);return `<div class="matiere-card" onclick="openMatiere('${esc(m).replace(/'/g,"\\'")}')">
+      ${mats.map(m=>{const counts=catsFor(uid,fid,a,m).map(c=>({c,n:countMat(uid,fid,a,m,c.id,sem)}));const total=counts.reduce((s,x)=>s+x.n,0);return `<div class="matiere-card" onclick="openMatiere('${esc(m).replace(/'/g,"\\'")}')">
         <div class="mc-top"><h3>${esc(m)}</h3><span class="mc-total">${total} doc${total>1?"s":""}</span></div>
-        <div class="mc-chips">${counts.map(({c,n})=>`<span class="mc-chip ${n?"":"zero"}" title="${esc(c.label)}">${c.icon} <b>${n}</b></span>`).join("")}</div>
+        <div class="mc-chips">${counts.length?counts.map(({c,n})=>`<span class="mc-chip ${n?"":"zero"}" title="${esc(c.label)}">${c.icon} <b>${n}</b></span>`).join(""):'<span class="mc-chip zero">À venir</span>'}</div>
       </div>`;}).join("")}
     </div>`:`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucune matière en ${a} · ${sem}.</div>`}
   </div>`;
@@ -1877,14 +1909,14 @@ function Programme(){
 /* ===== Matiere ===== */
 function MatiereView(){
   const {annee,matiere}=state, sem=state.semestre||"S1", uid=state.univ.id, fid=state.faculte.id;
-  const cats=allCategories();
-  const tab=state.tab&&cats.find(c=>c.id===state.tab)?state.tab:(cats[0]&&cats[0].id||"Cours");
-  const items=itemsFor(uid,fid,annee,matiere,tab,sem);
+  const cats=catsFor(uid,fid,annee,matiere);
+  const tab=state.tab&&cats.find(c=>c.id===state.tab)?state.tab:(cats[0]&&cats[0].id||null);
+  const items=tab?itemsFor(uid,fid,annee,matiere,tab,sem):[];
   return `<div class="wrap fade" style="padding:30px 0 0">
     <button class="btn btn-ghost btn-sm" style="border:none;padding:0;color:var(--sub);margin-bottom:16px" onclick="nav('programme')">← ${state.faculte.nom} · ${annee} · ${sem}</button>
     <h1 class="serif" style="font-size:38px;color:var(--ink);margin:0 0 20px">${matiere}</h1>
-    <div class="tabs">${cats.map(c=>`<button class="${tab===c.id?"on":""}" onclick="setTab('${c.id}')">${esc(c.label)} <span style="color:var(--muted);font-weight:400">${countMat(uid,fid,annee,matiere,c.id,sem)}</span></button>`).join("")}</div>
-    ${items.length?`<div class="content-grid">${items.map(it=>contentCardHTML(it)).join("")}</div>`:`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucun contenu ici pour l'instant.</div>`}
+    ${cats.length?`<div class="tabs">${cats.map(c=>`<button class="${tab===c.id?"on":""}" onclick="setTab('${c.id}')">${esc(c.label)} <span style="color:var(--muted);font-weight:400">${countMat(uid,fid,annee,matiere,c.id,sem)}</span></button>`).join("")}</div>
+    ${items.length?`<div class="content-grid">${items.map(it=>contentCardHTML(it)).join("")}</div>`:`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Aucun contenu ici pour l'instant.</div>`}`:`<div class="card" style="padding:40px;text-align:center;color:var(--muted)">Cette matière n'a pas encore de rubriques. Reviens bientôt — l'équipe Studia les met en place.</div>`}
     ${legalNoteHTML()}
   </div>`;
 }
@@ -2229,11 +2261,14 @@ function ProfileView(){
   // Étudiant déjà inscrit (univ+filière fixés) → cursus verrouillé. Admin jamais limité. 1re complétion autorisée.
   const cursusLocked = !isAdmin && !!(p.univ && p.faculte);
   const access = (!isAdmin && p.annee && p.faculte) ? studentAccess(p) : null;
+  // Année / semestre RÉELS (calculés par le calendrier) plutôt que la valeur figée à l'inscription
+  const curAnnee = access ? access.level : (p.annee||"");
+  const curSem = access ? access.semester : (p.semestre||"");
   const SL='font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px';
   const cursusEdit = cursusLocked
     ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:6px">🔒 Cursus verrouillé</div>
-         <div style="font-size:13.5px;color:var(--text)"><b>${esc(univNameOf(p.univ))}</b> · ${esc(facNameOf(p.univ,p.faculte))} · ${esc(p.annee||"")} · ${esc(p.semestre||"S1")}</div>
+         <div style="font-size:13.5px;color:var(--text)"><b>${esc(univNameOf(p.univ))}</b> · ${esc(facNameOf(p.univ,p.faculte))} · ${esc(curAnnee)} · ${esc(curSem)}</div>
          <p class="muted" style="font-size:11.5px;margin:6px 0 0;line-height:1.4">Ton université, ta filière, ton année et ton semestre sont fixés à l'inscription et ne sont pas modifiables. Pour les corriger, écris à <b>studia.contact@gmail.com</b>.</p>
        </div>`
     : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -2287,7 +2322,7 @@ function ProfileView(){
           `:`
             <h1 class="serif" style="font-size:32px;color:var(--ink);margin:0 0 4px;line-height:1.1">${esc((v.prenom+" "+v.nom).trim())||state.user.email.split("@")[0]}</h1>
             <div class="muted" style="margin-bottom:8px">${esc(state.user.email)}</div>
-            ${p.univ?`<div style="font-size:14px;color:var(--text)"><b>${esc(univNameOf(p.univ))}</b>${p.faculte?" · "+esc(facNameOf(p.univ,p.faculte)):""}${p.annee?" · "+esc(p.annee):""}${p.semestre?" · "+esc(p.semestre):""}</div>`:'<div class="muted">Profil pas encore complété</div>'}
+            ${p.univ?`<div style="font-size:14px;color:var(--text)"><b>${esc(univNameOf(p.univ))}</b>${p.faculte?" · "+esc(facNameOf(p.univ,p.faculte)):""}${curAnnee?" · "+esc(curAnnee):""}${curSem?" · "+esc(curSem):""}</div>`:'<div class="muted">Profil pas encore complété</div>'}
             ${p.bio?`<p style="margin:10px 0 0;color:var(--sub);font-size:14px;line-height:1.5">${esc(p.bio)}</p>`:""}
             <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn-ghost btn-sm" onclick="state.editProfile=true;render()">${p.nom?"Modifier mon profil":"Compléter mon profil"}</button>
@@ -2303,11 +2338,11 @@ function ProfileView(){
       <div style="display:grid;gap:0;font-size:14.5px">
         ${profileInfoRow("Université",esc(univNameOf(p.univ)))}
         ${profileInfoRow("Filière",esc(facNameOf(p.univ,p.faculte)))}
-        ${profileInfoRow("Année",esc(p.annee||""))}
-        ${profileInfoRow("Semestre",esc(p.semestre||""))}
+        ${profileInfoRow("Année en cours",esc(curAnnee))}
+        ${profileInfoRow("Semestre",esc(curSem))}
       </div>
       ${access?`<div style="margin-top:14px;background:var(--accentSoft);border:1px solid #CFEAD7;border-radius:10px;padding:14px 16px">
-        <div style="font-size:13.5px;color:var(--text)">Tu as actuellement accès à <b>${access.level} · ${access.semester}</b>${access.levelIdx>0?` et à toutes les années précédentes`:""}.</div>
+        <div style="font-size:13.5px;color:var(--text)">Tu as accès au <b>${access.level} · ${access.semester}</b> uniquement (ton année en cours).</div>
         ${accessHints}
       </div>`:""}
     </div>`:""}
@@ -2588,7 +2623,7 @@ function aGo(view){state.a.view=view;render();}
 function aPickUniv(id){const u=univById(id);if(!u||!u.actif)return;state.a.univ=u;state.a.view="fac";render();}
 function aPickFac(fid){state.a.fac=facById(state.a.univ.id,fid);state.a.view="niv";render();}
 function aPickNiv(n){state.a.niv=n;state.a.view="mat";render();}
-function aPickMat(idx){const m=matieresFor(state.a.univ.id,state.a.fac.id,state.a.niv)[idx];if(m==null)return;state.a.mat=m;state.a.tab="Cours";state.a.view="manage";render();}
+function aPickMat(idx){const m=matieresFor(state.a.univ.id,state.a.fac.id,state.a.niv)[idx];if(m==null)return;state.a.mat=m;const cats=catsFor(state.a.univ.id,state.a.fac.id,state.a.niv,m);state.a.tab=(cats[0]||{}).id||null;state.a.view="manage";render();}
 function promptAddMatiere(){
   const nom=prompt("Nom de la nouvelle matière :");
   if(nom&&nom.trim()){
@@ -2654,7 +2689,7 @@ function AdminConsole(){
     body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom}</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">${["L1","L2","L3"].map(n=>`<div class="card card-h" style="padding:24px;text-align:center" onclick="aPickNiv('${n}')"><div class="serif" style="font-size:32px;color:var(--ink)">${n}</div><div class="muted">${state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===a.fac.id&&c.annee===n).length} contenus</div></div>`).join("")}</div>`;
   } else if(a.view==="mat"){
     const mats=matieresFor(a.univ.id,a.fac.id,a.niv);
-    body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom} · ${a.niv}</h2><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${mats.map((m,i)=>{const n=typeIds().map(t=>countMat(a.univ.id,a.fac.id,a.niv,m,t)).reduce((x,y)=>x+y,0);return `<div class="card" style="padding:20px;position:relative"><div class="card-h" style="cursor:pointer" onclick="aPickMat(${i})"><div style="display:flex;justify-content:space-between"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0;padding-right:24px">${esc(m)}</h3><span style="color:var(--muted)">›</span></div><div class="muted" style="margin-top:8px">${n} contenus</div></div><button title="Supprimer la matière" onclick="event.stopPropagation();deleteMatiere('${esc(m).replace(/'/g,"\\'")}')" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--muted);font-size:16px;width:28px;height:28px;border-radius:6px;cursor:pointer" onmouseover="this.style.background='#FBEDEC';this.style.color='#B4453A'" onmouseout="this.style.background='none';this.style.color='var(--muted)'">×</button></div>`;}).join("")}<div class="card card-h" style="padding:20px;display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--borderStrong);background:transparent;cursor:pointer" onclick="promptAddMatiere()"><span style="color:var(--accentDark);font-weight:500">+ Ajouter une matière</span></div></div>`;
+    body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom} · ${a.niv}</h2><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${mats.map((m,i)=>{const n=state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===a.fac.id&&c.annee===a.niv&&c.matiere===m).length;return `<div class="card" style="padding:20px;position:relative"><div class="card-h" style="cursor:pointer" onclick="aPickMat(${i})"><div style="display:flex;justify-content:space-between"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0;padding-right:24px">${esc(m)}</h3><span style="color:var(--muted)">›</span></div><div class="muted" style="margin-top:8px">${n} contenus</div></div><button title="Supprimer la matière" onclick="event.stopPropagation();deleteMatiere('${esc(m).replace(/'/g,"\\'")}')" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--muted);font-size:16px;width:28px;height:28px;border-radius:6px;cursor:pointer" onmouseover="this.style.background='#FBEDEC';this.style.color='#B4453A'" onmouseout="this.style.background='none';this.style.color='var(--muted)'">×</button></div>`;}).join("")}<div class="card card-h" style="padding:20px;display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--borderStrong);background:transparent;cursor:pointer" onclick="promptAddMatiere()"><span style="color:var(--accentDark);font-weight:500">+ Ajouter une matière</span></div></div>`;
   } else {
     body=AdminManage();
   }
@@ -2846,56 +2881,76 @@ function AdminStatsView(){
     <div style="margin-top:18px;text-align:center"><button class="btn btn-ghost btn-sm" onclick="loadAdminStats()">↻ Actualiser les stats</button></div>
   </div>`;
 }
+// Carte d'information sur la page d'accueil admin : les rubriques sont désormais PAR MATIÈRE.
 function CategoriesAdmin(){
-  const cats=allCategories();
-  return `<div class="card" style="padding:24px;margin-bottom:18px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
+  return `<div class="card" style="padding:22px 24px;margin-bottom:18px;background:#F7F6F3">
+    <h3 class="serif" style="font-size:20px;color:var(--ink);margin:0 0 6px">Rubriques par matière</h3>
+    <p class="muted" style="margin:0;line-height:1.55;font-size:13.5px">Les onglets de contenu (Cours, TD, Examen…) ne sont plus globaux : <b>chaque matière a ses propres rubriques</b>. Ce qui est demandé en droit n'est pas ce qui est demandé en éco-gestion. Pour les gérer, descends dans une <b>université → filière → année → matière</b> : l'éditeur de rubriques s'affiche sous la liste de contenus.</p>
+  </div>`;
+}
+// Éditeur de rubriques scopé à une matière précise (utilisé dans la console de gestion d'une matière)
+function MatiereCategoriesEditor(univ,faculte,annee,matiere){
+  const cats=catsFor(univ,faculte,annee,matiere);
+  const sc=_scopeKey(univ,faculte,annee,matiere);
+  const scAttr=esc(sc).replace(/'/g,"\\'");
+  return `<div class="card" style="padding:20px;margin-top:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
       <div>
-        <h3 class="serif" style="font-size:22px;color:var(--ink);margin:0">Catégories de contenu</h3>
-        <p class="muted" style="margin:4px 0 0">Tu peux ajouter, renommer ou supprimer les types qui apparaissent en onglets dans chaque matière.</p>
+        <h3 style="font-size:15px;color:var(--ink);font-weight:600;margin:0">Rubriques de « ${esc(matiere)} »</h3>
+        <p class="muted" style="margin:3px 0 0;font-size:12px">Ces onglets n'existent que pour cette matière (${annee}).</p>
       </div>
-      <button class="btn btn-accent btn-sm" onclick="openNewCategory()">+ Nouvelle catégorie</button>
+      <button class="btn btn-accent btn-sm" onclick="openNewCategory('${scAttr}')">+ Rubrique</button>
     </div>
     <div style="display:grid;gap:8px">
-      ${cats.length?cats.map(c=>`<div class="card" style="padding:12px 14px;display:flex;align-items:center;gap:12px">
-        <input class="input" style="width:46px;padding:6px;text-align:center;font-size:18px" value="${esc(c.icon||"📄")}" oninput="updCategory('${esc(c.id)}','icon',this.value)" maxlength="3"/>
-        <input class="input" style="width:130px;padding:6px 8px;font-size:13px;font-family:ui-monospace,Menlo,monospace;background:#F2F1EE" value="${esc(c.id)}" readonly title="ID immuable (ne peut pas être renommé)"/>
-        <input class="input" style="flex:1;padding:6px 10px;font-size:13.5px" value="${esc(c.label)}" oninput="updCategory('${esc(c.id)}','label',this.value)" placeholder="Libellé affiché"/>
-        <input type="number" class="input" style="width:70px;padding:6px;font-size:13px;text-align:center" value="${c.position||0}" oninput="updCategory('${esc(c.id)}','position',+this.value||0)" title="Ordre"/>
-        <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="deleteCategoryConfirm('${esc(c.id)}')" title="Supprimer">×</button>
-      </div>`).join(""):'<div class="muted" style="padding:24px;text-align:center">Aucune catégorie. Ajoutes-en une.</div>'}
+      ${cats.length?cats.map(c=>{const cidAttr=esc(c.id).replace(/'/g,"\\'");return `<div class="card" style="padding:10px 12px;display:flex;align-items:center;gap:10px">
+        <input class="input" style="width:42px;padding:6px;text-align:center;font-size:17px" value="${esc(c.icon||"📄")}" oninput="updCategory('${scAttr}','${cidAttr}','icon',this.value)" maxlength="3"/>
+        <input class="input" style="width:120px;padding:6px 8px;font-size:12.5px;font-family:ui-monospace,Menlo,monospace;background:#F2F1EE" value="${esc(c.id)}" readonly title="ID immuable (stocké en base)"/>
+        <input class="input" style="flex:1;padding:6px 10px;font-size:13px" value="${esc(c.label)}" oninput="updCategory('${scAttr}','${cidAttr}','label',this.value)" placeholder="Libellé affiché"/>
+        <input type="number" class="input" style="width:60px;padding:6px;font-size:12.5px;text-align:center" value="${c.position||0}" oninput="updCategory('${scAttr}','${cidAttr}','position',+this.value||0)" title="Ordre"/>
+        <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="deleteCategoryConfirm('${scAttr}','${cidAttr}')" title="Supprimer">×</button>
+      </div>`;}).join(""):'<div class="muted" style="padding:18px;text-align:center">Aucune rubrique pour cette matière. Ajoutes-en une pour pouvoir y ajouter du contenu.</div>'}
     </div>
-    <p class="muted" style="margin-top:14px;font-size:11.5px;line-height:1.5">⚠️ L'<b>ID</b> est utilisé en base et ne peut pas changer. Tu peux modifier le <b>libellé</b> affiché et l'<b>icône</b>. La position contrôle l'ordre des onglets dans une matière.</p>
+    <p class="muted" style="margin-top:12px;font-size:11.5px;line-height:1.5">⚠️ L'<b>ID</b> est stocké en base (champ <code>type</code> des contenus) et ne peut pas changer. Tu peux modifier le <b>libellé</b>, l'<b>icône</b> et la <b>position</b>.</p>
   </div>`;
 }
 const _catUpdTimers={};
-function updCategory(id,k,v){
-  const c=state.categories.find(x=>x.id===id);if(!c)return;c[k]=v;
-  if(_catUpdTimers[id+k])clearTimeout(_catUpdTimers[id+k]);
-  _catUpdTimers[id+k]=setTimeout(async()=>{await dbUpsertCategory({id:c.id,label:c.label,icon:c.icon,position:c.position});},600);
+function updCategory(sc,id,k,v){
+  const s=_parseScope(sc);
+  const c=(state.categories||[]).find(x=>x.univ===s.univ&&x.faculte===s.faculte&&x.annee===s.annee&&x.matiere===s.matiere&&x.id===id);
+  if(!c)return;c[k]=v;
+  const key=sc+"|"+id+"|"+k;
+  if(_catUpdTimers[key])clearTimeout(_catUpdTimers[key]);
+  _catUpdTimers[key]=setTimeout(()=>{dbUpsertCategory(c);},600);
 }
-async function deleteCategoryConfirm(id){
-  const inUse=state.contenus.filter(c=>c.type===id).length;
-  const msg=inUse?`${inUse} contenu(s) utilisent encore « ${id} ». Supprimer la catégorie quand même ? (Les contenus garderont le type « ${id} » mais l'onglet ne s'affichera plus.)`:`Supprimer la catégorie « ${id} » ?`;
+async function deleteCategoryConfirm(sc,id){
+  const s=_parseScope(sc);
+  const inUse=state.contenus.filter(c=>c.univ===s.univ&&c.faculte===s.faculte&&c.annee===s.annee&&c.matiere===s.matiere&&c.type===id).length;
+  const msg=inUse?`${inUse} contenu(s) de « ${s.matiere} » utilisent « ${id} ». Supprimer la rubrique quand même ? (Les contenus garderont le type « ${id} » mais l'onglet disparaîtra.)`:`Supprimer la rubrique « ${id} » de « ${s.matiere} » ?`;
   if(!confirm(msg))return;
-  await dbDeleteCategory(id);
-  state.categories=state.categories.filter(x=>x.id!==id);
+  await dbDeleteCategory(Object.assign({id},s));
+  state.categories=(state.categories||[]).filter(c=>!(c.univ===s.univ&&c.faculte===s.faculte&&c.annee===s.annee&&c.matiere===s.matiere&&c.id===id));
+  if(state.a&&state.a.tab===id)state.a.tab=(catsFor(s.univ,s.faculte,s.annee,s.matiere)[0]||{}).id||null;
   render();
 }
-function openNewCategory(){
-  const id=prompt("ID de la catégorie (un mot court, sans espace ni accent — ex. 'Partiel', 'Annale', 'Methode') :");
+function openNewCategory(sc){
+  const s=_parseScope(sc);
+  const id=prompt("ID de la rubrique (un mot court, sans espace ni accent — ex. 'Cours', 'TD', 'Partiel', 'Annale') :");
   if(!id||!id.trim())return;
   const safeId=id.trim().replace(/\s+/g,"");
-  if(state.categories.find(c=>c.id===safeId)){toast("Cette catégorie existe déjà","warn");return;}
-  const label=prompt("Libellé affiché à l'utilisateur :",safeId)||safeId;
+  if((state.categories||[]).find(c=>c.univ===s.univ&&c.faculte===s.faculte&&c.annee===s.annee&&c.matiere===s.matiere&&c.id===safeId)){toast("Cette rubrique existe déjà pour cette matière","warn");return;}
+  const label=prompt("Libellé affiché à l'étudiant :",safeId)||safeId;
   const icon=prompt("Icône (emoji) :",defaultIconFor(safeId))||"📄";
-  const position=(state.categories.reduce((m,c)=>Math.max(m,c.position||0),0)+1);
-  const newC={id:safeId,label,icon,position};
-  dbUpsertCategory(newC).then(r=>{if(r.ok){state.categories.push(newC);state.categories.sort((a,b)=>(a.position||0)-(b.position||0));render();}});
+  const position=catsFor(s.univ,s.faculte,s.annee,s.matiere).reduce((m,c)=>Math.max(m,c.position||0),0)+1;
+  const newC=Object.assign({},s,{id:safeId,label,icon,position});
+  dbUpsertCategory(newC).then(r=>{if(r&&r.ok){state.categories.push(newC);if(state.a&&!state.a.tab)state.a.tab=safeId;render();}});
 }
 function AdminManage(){
   const a=state.a, o=state.opt;
-  let list=itemsFor(a.univ.id,a.fac.id,a.niv,a.mat,a.tab,state.semestre||"S1").slice();
+  const cats=catsFor(a.univ.id,a.fac.id,a.niv,a.mat);
+  const hasCats=cats.length>0;
+  // normalise l'onglet actif : doit pointer sur une rubrique réelle de CETTE matière
+  if(hasCats){if(!a.tab||!cats.find(c=>c.id===a.tab))a.tab=cats[0].id;}else{a.tab=null;}
+  let list=a.tab?itemsFor(a.univ.id,a.fac.id,a.niv,a.mat,a.tab,state.semestre||"S1").slice():[];
   if(a.sort==="recent")list.sort((x,y)=>(y.ts||0)-(x.ts||0));
   else if(a.sort==="az")list.sort((x,y)=>x.titre.localeCompare(y.titre));
   const modeSeg=[["coin","Coin"],["bandeau","Bandeau bas"],["mosaique","Mosaïque (fond)"]];
@@ -2904,9 +2959,9 @@ function AdminManage(){
       <div class="card" style="padding:20px">
         <div class="muted" style="margin-bottom:4px">Upload dans</div>
         <div style="font-weight:600;color:var(--ink);font-size:15px;margin-bottom:2px">${a.mat}</div>
-        <div class="muted" style="margin-bottom:10px">${a.univ.ville} · ${a.fac.nom} · ${a.niv} · <b style="color:var(--accentDark)">${labelFor(a.tab)}</b> · <b style="color:var(--accentDark)">${state.semestre||"S1"}</b></div>
+        <div class="muted" style="margin-bottom:10px">${a.univ.ville} · ${a.fac.nom} · ${a.niv} · <b style="color:var(--accentDark)">${hasCats?labelFor(a.tab):"—"}</b> · <b style="color:var(--accentDark)">${state.semestre||"S1"}</b></div>
         <div class="seg sm" style="margin-bottom:14px">${["S1","S2"].map(s=>`<button class="${(state.semestre||"S1")===s?"on":""}" onclick="state.semestre='${s}';render()">${s}</button>`).join("")}</div>
-        <div class="dz" id="dz"><strong>Dépose un fichier PDF / image</strong><br/><span style="font-size:12px">stocké dans le bucket privé + tatoué — semestre <b>${state.semestre||"S1"}</b></span><input type="file" id="fi" accept="image/*,application/pdf" multiple style="display:none"/></div>
+        ${hasCats?`<div class="dz" id="dz"><strong>Dépose un fichier PDF / image</strong><br/><span style="font-size:12px">dans <b>${esc(labelFor(a.tab))}</b> · bucket privé + tatoué — semestre <b>${state.semestre||"S1"}</b></span><input type="file" id="fi" accept="image/*,application/pdf" multiple style="display:none"/></div>`:`<div class="card" style="padding:16px;text-align:center;color:var(--muted);background:#FBF6EC;border-color:#E8D9B8;font-size:12.5px;line-height:1.5">⚠️ Crée d'abord au moins une <b>rubrique</b> pour cette matière (éditeur en bas) avant d'ajouter du contenu.</div>`}
       </div>
       <div class="card" style="padding:20px;margin-top:14px">
         <h3 style="font-size:15px;color:var(--ink);font-weight:600;margin:0 0 12px">Placement du QR</h3>
@@ -2931,14 +2986,15 @@ function AdminManage(){
       <div class="note" style="margin-top:14px">⚠️ <div>Le tatouage protège tes contenus <b>originaux</b>. Déclare-le dans tes CGU.</div></div>
     </div>
     <div>
-      <div class="tabs">${typeIds().map(t=>`<button class="${a.tab===t?"on":""}" onclick="aSet('tab','${t}')">${labelFor(t)} <span style="color:var(--muted);font-weight:400">${countMat(a.univ.id,a.fac.id,a.niv,a.mat,t)}</span></button>`).join("")}</div>
+      ${hasCats?`<div class="tabs">${cats.map(t=>`<button class="${a.tab===t.id?"on":""}" onclick="aSet('tab','${esc(t.id).replace(/'/g,"\\'")}')">${esc(t.label)} <span style="color:var(--muted);font-weight:400">${countMat(a.univ.id,a.fac.id,a.niv,a.mat,t.id,state.semestre||"S1")}</span></button>`).join("")}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap"><div class="muted">${list.length} élément${list.length>1?"s":""}</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <button class="btn btn-accent btn-sm" onclick="openNewContenu()">+ Nouveau contenu</button>
           <div class="seg sm">${[["recent","Récents"],["az","A-Z"]].map(([s,l])=>`<button class="${a.sort===s?"on":""}" onclick="aSet('sort','${s}')">${l}</button>`).join("")}</div>
         </div>
       </div>
-      <div id="aList">${adminListHTML(list)}</div>
+      <div id="aList">${adminListHTML(list)}</div>`:`<div class="card" style="padding:32px;text-align:center;color:var(--muted)">Aucune rubrique définie pour « ${esc(a.mat)} ». Utilise l'éditeur ci-dessous pour en créer (ex. Cours, TD, Examen).</div>`}
+      ${MatiereCategoriesEditor(a.univ.id,a.fac.id,a.niv,a.mat)}
     </div>
   </div>`;
 }
@@ -3052,6 +3108,7 @@ async function processRecord(c){
 }
 async function handleFiles(files){
   const a=state.a;
+  if(!a.tab||!catsFor(a.univ.id,a.fac.id,a.niv,a.mat).find(c=>c.id===a.tab)){toast("Crée d'abord une rubrique pour cette matière","warn");return;}
   for(const file of files){
     const kind=file.type==="application/pdf"?"pdf":(file.type.startsWith("image/")?"image":null);if(!kind)continue;
     const c={id:genId(),source:"upload",kind,file,
@@ -3239,18 +3296,20 @@ function stopScan(){
 }
 
 /* ===== Modal "Nouveau contenu" ===== */
-function openNewContenu(){state.newC={open:true};renderNewContenu();}
+function openNewContenu(){const a=state.a;if(!catsFor(a.univ.id,a.fac.id,a.niv,a.mat).length){toast("Crée d'abord une rubrique pour cette matière","warn");return;}state.newC={open:true};renderNewContenu();}
 function closeNewContenu(){state.newC={open:false};renderNewContenu();}
 async function saveNewContenu(){
   const a=state.a;
   const get=id=>(document.getElementById(id)||{}).value||"";
   const titre=get("ncTitre").trim();
   if(!titre){alert("Titre requis.");return;}
+  const ncType=get("ncType")||a.tab;
+  if(!ncType){alert("Choisis une rubrique (crée-en une d'abord pour cette matière).");return;}
   const c={
     id:genId(),source:"upload",
     univ:a.univ.id,faculte:a.fac.id,annee:a.niv,matiere:a.mat,
     semestre:get("ncSemestre")||state.semestre||"S1",
-    type:get("ncType")||a.tab,
+    type:ncType,
     titre,tuteur:get("ncTuteur")||"—",note:get("ncNote")||"—",duree:get("ncDuree")||"",
     video_url:get("ncVideo").trim()||null,
     video_corrige_url:get("ncVideoCorr").trim()||null,
@@ -3275,7 +3334,7 @@ function renderNewContenu(){
     <div style="display:grid;gap:10px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Type</label>
-          <select class="input" id="ncType">${typeIds().map(t=>`<option value="${t}" ${a.tab===t?"selected":""}>${labelFor(t)}</option>`).join("")}</select></div>
+          <select class="input" id="ncType">${catsFor(a.univ.id,a.fac.id,a.niv,a.mat).map(t=>`<option value="${t.id}" ${a.tab===t.id?"selected":""}>${esc(t.label)}</option>`).join("")||'<option value="">— Crée une rubrique d\'abord —</option>'}</select></div>
         <div><label class="muted" style="font-size:12px;display:block;margin-bottom:4px">Semestre</label>
           <select class="input" id="ncSemestre">${["S1","S2"].map(s=>`<option value="${s}" ${(state.semestre||"S1")===s?"selected":""}>${s}</option>`).join("")}</select></div>
       </div>
