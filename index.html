@@ -12,6 +12,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
 :root{--bg:#FBFBFA;--surface:#FFFFFF;--border:#EAE9E6;--borderStrong:#DEDDD9;--ink:#1A1A18;--text:#37352F;--sub:#6F6E69;--muted:#9B9A94;--accent:#34C759;--accentDark:#2A9D47;--accentSoft:#E7F8EC;--amber:#9A6A18;--amberSoft:#F6EFDF;--sans:'Geist',-apple-system,BlinkMacSystemFont,sans-serif;--serif:'Instrument Serif',Georgia,serif}
 *{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
 button{font-family:var(--sans);cursor:pointer}
 input,select,textarea{font-family:var(--sans)}
@@ -34,6 +35,8 @@ a{color:inherit;text-decoration:none}
 .btn-lg{padding:12px 22px;font-size:15px}
 .input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--borderStrong);background:var(--bg);font-size:14px;color:var(--ink);outline:none}
 .input:focus{border-color:var(--accent)}
+/* iOS: éviter le zoom auto au focus d'un champ <16px (sinon la page reste zoomée/décentrée sur iPhone) */
+@media(max-width:640px){.input,input,select,textarea{font-size:16px!important}}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:14px}
 .card-h{transition:all .2s cubic-bezier(.2,.7,.2,1);cursor:pointer}
 .card-h:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 28px rgba(30,140,60,.10)}
