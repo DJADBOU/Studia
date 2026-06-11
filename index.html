@@ -4,16 +4,18 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Studia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://unpkg.com/jsqr@1.4.0/dist/jsQR.js';document.head.appendChild(s);"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
-:root{--bg:#FBFBFA;--surface:#FFFFFF;--border:#EAE9E6;--borderStrong:#DEDDD9;--ink:#1A1A18;--text:#37352F;--sub:#6F6E69;--muted:#9B9A94;--accent:#34C759;--accentDark:#2A9D47;--accentSoft:#E7F8EC;--amber:#9A6A18;--amberSoft:#F6EFDF;--sans:'Geist',-apple-system,BlinkMacSystemFont,sans-serif;--serif:'Instrument Serif',Georgia,serif}
+:root{--bg:#FBFBFA;--surface:#FFFFFF;--border:#EAE9E6;--borderStrong:#DEDDD9;--ink:#1A1A18;--text:#37352F;--sub:#6F6E69;--muted:#9B9A94;--accent:#34C759;--accentDark:#2A9D47;--accentSoft:#E7F8EC;--amber:#9A6A18;--amberSoft:#F6EFDF;--sans:'Geist',-apple-system,BlinkMacSystemFont,sans-serif;--serif:'Instrument Serif',Georgia,serif;--ease:cubic-bezier(.25,.1,.25,1);--ease-soft:cubic-bezier(.16,1,.3,1);--shadow-sm:0 1px 2px rgba(26,26,24,.04),0 4px 12px rgba(26,26,24,.05);--shadow-md:0 6px 16px rgba(26,26,24,.05),0 16px 40px rgba(26,26,24,.07);--shadow-lg:0 10px 28px rgba(26,26,24,.06),0 30px 72px rgba(26,26,24,.10)}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
-body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.6;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
 button{font-family:var(--sans);cursor:pointer}
 input,select,textarea{font-family:var(--sans)}
 a{color:inherit;text-decoration:none}
@@ -27,8 +29,11 @@ a{color:inherit;text-decoration:none}
 .pill{font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:6px;background:var(--accentSoft);color:var(--accentDark);white-space:nowrap}
 .tag{font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:6px;background:#F2F1EE;color:var(--sub);white-space:nowrap}
 .tag.amber{background:var(--amberSoft);color:var(--amber)}
-.btn{border:1px solid transparent;border-radius:8px;font-weight:500;font-size:14px;padding:9px 16px;display:inline-flex;align-items:center;gap:7px;justify-content:center;transition:opacity .15s}
-.btn:hover{opacity:.88}
+.btn{border:1px solid transparent;border-radius:10px;font-weight:500;font-size:14px;padding:10px 18px;display:inline-flex;align-items:center;gap:7px;justify-content:center;letter-spacing:-.01em;transition:transform .35s var(--ease),box-shadow .35s var(--ease),background .2s,border-color .2s,opacity .2s}
+.btn:hover{opacity:.95;transform:translateY(-1px)}
+.btn-ink:hover,.btn-accent:hover{box-shadow:var(--shadow-md)}
+.btn-ghost:hover{border-color:var(--ink);opacity:1}
+.btn:active{transform:translateY(0);transition:transform .08s}
 .btn-ink{background:var(--ink);color:#fff}.btn-accent{background:var(--accent);color:#fff}
 .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--borderStrong)}
 .btn-sm{padding:6px 12px;font-size:13px}
@@ -38,13 +43,13 @@ a{color:inherit;text-decoration:none}
 /* iOS: éviter le zoom auto au focus d'un champ <16px (sinon la page reste zoomée/décentrée sur iPhone) */
 @media(max-width:640px){.input,input,select,textarea{font-size:16px!important}}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:14px}
-.card-h{transition:all .2s cubic-bezier(.2,.7,.2,1);cursor:pointer}
-.card-h:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 28px rgba(30,140,60,.10)}
-.card-h:active{transform:translateY(-1px);transition:transform .05s}
+.card-h{transition:transform .4s var(--ease),box-shadow .4s var(--ease),border-color .3s var(--ease);cursor:pointer}
+.card-h:hover{border-color:var(--borderStrong);transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.card-h:active{transform:translateY(-1px);transition:transform .08s}
 .muted{color:var(--muted);font-size:12px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .fade{animation:fadeUp .45s ease both}
-.nav{position:sticky;top:0;z-index:30;background:rgba(251,251,250,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.nav{position:sticky;top:0;z-index:30;background:rgba(251,251,250,.72);backdrop-filter:blur(20px) saturate(1.7);-webkit-backdrop-filter:blur(20px) saturate(1.7);border-bottom:1px solid var(--border)}
 .nav-in{height:60px;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .nav-links{display:flex;align-items:center;gap:4px}
 .nav-links .link{background:none;border:none;font-size:14px;padding:7px 12px;border-radius:7px;color:var(--sub)}
@@ -93,9 +98,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .bookmark-btn.on{color:#F5A623}
 /* ===== Matières & contenus (redesign cartes) ===== */
 .mat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:16px}
-.matiere-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px 20px 18px 24px;overflow:hidden;cursor:pointer;transition:transform .2s cubic-bezier(.2,.7,.2,1),box-shadow .2s,border-color .2s}
+.matiere-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px 20px 18px 24px;overflow:hidden;cursor:pointer;transition:transform .4s var(--ease),box-shadow .4s var(--ease),border-color .3s var(--ease)}
 .matiere-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,var(--accent),var(--accentDark));opacity:.9}
-.matiere-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 14px 30px rgba(30,140,60,.12)}
+.matiere-card:hover{border-color:var(--borderStrong);transform:translateY(-4px);box-shadow:var(--shadow-lg)}
 .matiere-card:active{transform:translateY(-1px);transition:transform .05s}
 .matiere-card .mc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px}
 .matiere-card h3{font-size:16.5px;color:var(--ink);font-weight:600;margin:0;line-height:1.32}
@@ -105,8 +110,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .mc-chip.zero{opacity:.42}
 .mc-chip b{font-weight:600;color:var(--text)}
 .content-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:16px}
-.content-card{position:relative;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .2s cubic-bezier(.2,.7,.2,1),box-shadow .2s,border-color .2s}
-.content-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 12px 28px rgba(30,140,60,.10)}
+.content-card{position:relative;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .4s var(--ease),box-shadow .4s var(--ease),border-color .3s var(--ease)}
+.content-card:hover{border-color:var(--borderStrong);transform:translateY(-4px);box-shadow:var(--shadow-lg)}
 .content-card:active{transform:translateY(-1px);transition:transform .05s}
 .cc-cover{position:relative;height:126px;display:flex;align-items:center;justify-content:center;font-size:38px;overflow:hidden}
 .cc-cover img{width:100%;height:100%;object-fit:cover;display:block}
@@ -142,7 +147,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .trace-result.miss{background:#FBEDEC;color:#8A3C34}
 .modal-bg{position:fixed;inset:0;z-index:60;background:rgba(26,26,24,.45);display:flex;align-items:center;justify-content:center;padding:20px}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;max-width:380px;width:100%;padding:28px}
-.sec{padding:60px 0;border-top:1px solid var(--border)}
+.sec{padding:84px 0;border-top:1px solid var(--border)}
+@media(max-width:640px){.sec{padding:54px 0}}
 .photo{position:relative;overflow:hidden;background:linear-gradient(135deg,#34C759,#1E8C3C)}
 .photo img{width:100%;height:100%;object-fit:cover;display:block}
 .hero-img{position:absolute;inset:0;z-index:0;overflow:hidden}
@@ -170,8 +176,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
 /* ===== Nouvelles sections : stats, testimonials, founders ===== */
-.reveal{opacity:0;transform:translateY(24px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .8s var(--ease),transform .8s var(--ease)}
 .reveal.in{opacity:1;transform:translateY(0)}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}.reveal{opacity:1!important;transform:none!important}}
 .eyebrow{font-size:12px;font-weight:600;color:var(--accentDark);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:14px;display:inline-block}
 
 /* Stats band */
@@ -200,7 +207,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 /* Founders */
 .founders-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px}
 .founder{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px;transition:all .35s cubic-bezier(.2,.7,.2,1);overflow:hidden;cursor:pointer}
-.founder:hover{border-color:var(--accent);transform:translateY(-5px);box-shadow:0 14px 36px rgba(52,199,89,.15)}
+.founder:hover{border-color:var(--borderStrong);transform:translateY(-5px);box-shadow:var(--shadow-lg)}
 .founder-top{display:flex;gap:18px;align-items:center}
 .founder-avatar{width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,#5BD974,#1E8C3C);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--sans);font-weight:700;font-size:32px;letter-spacing:-1px;flex-shrink:0;box-shadow:0 8px 22px rgba(30,140,60,.32);overflow:hidden;position:relative}
 .founder-avatar img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%}
@@ -237,8 +244,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .hero-glow{position:absolute;top:-200px;right:-150px;width:520px;height:520px;background:radial-gradient(circle,rgba(52,199,89,.22),transparent 70%);pointer-events:none;z-index:0}
 
 /* Section title polish */
-.sec-title{font-family:var(--serif);font-size:clamp(28px,3.5vw,40px);color:var(--ink);margin:0 0 10px;line-height:1.1;letter-spacing:-.5px}
-.sec-lead{font-size:16px;color:var(--sub);line-height:1.6;margin:0 0 32px;max-width:560px}
+.sec-title{font-family:var(--serif);font-size:clamp(30px,3.8vw,44px);color:var(--ink);margin:0 0 12px;line-height:1.06;letter-spacing:-1px}
+.sec-lead{font-size:16.5px;color:var(--sub);line-height:1.65;margin:0 0 34px;max-width:600px}
 
 /* Détail contenu — players & commentaires */
 .player-wrap{position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:16/9}
@@ -306,11 +313,13 @@ body.hide-content .hidden-on-blur::after{content:"⛔ Capture détectée — l'�
 .lp-float .ft{font-size:12.5px;color:var(--ink);font-weight:600;line-height:1.25;white-space:nowrap}
 .lp-float .fm{font-size:11px;color:var(--sub)}
 .lp-float .note{margin-left:4px;background:var(--accentSoft);color:var(--accentDark);font-weight:700;font-size:12px;padding:3px 8px;border-radius:7px;white-space:nowrap}
-.lp-f1{top:15%;left:1%;animation-delay:.2s}
-.lp-f2{top:22%;right:1%;animation-delay:1.4s}
-.lp-f3{bottom:13%;left:5%;animation-delay:.8s}
-.lp-f4{bottom:18%;right:4%;animation-delay:2s}
-@media(max-width:1040px){.lp-float{display:none}}
+.lp-f1{top:13%;right:calc(50% + 420px);animation-delay:.2s}
+.lp-f2{top:19%;left:calc(50% + 420px);animation-delay:1.4s}
+.lp-f3{bottom:15%;right:calc(50% + 420px);animation-delay:.8s}
+.lp-f4{bottom:20%;left:calc(50% + 420px);animation-delay:2s}
+@media(max-width:1439px){.lp-float{display:none}}
+.lp-norestart{animation:none!important}
+.lp-norestart .lp-hero-in>*{animation:none!important}
 .lp-logos{display:flex;align-items:center;justify-content:center;gap:30px;flex-wrap:wrap;padding:4px 0}
 .lp-logos .ll{height:40px;display:flex;align-items:center;filter:grayscale(1);opacity:.5;transition:filter .25s,opacity .25s}
 .lp-logos .ll:hover{filter:grayscale(0);opacity:1}
@@ -1273,7 +1282,7 @@ const FOUNDERS=[
    bio:"Étudiant à l'Université Côte d'Azur, passionné par l'éducation et la tech. J'ai créé Studia avec Ellis pour que chaque étudiant ait accès aux explications des meilleurs de sa promo — la méthode, les pièges, ce que le correcteur attend vraiment.",
    tags:["UCA","Économie & Gestion","Tech & produit"]},
   {initiales:"ET",nom:"Ellis Taïeb",role:"Co-fondateur",photo:"ellis.jpg",linkedin:"https://www.linkedin.com/in/ellis-taieb-migueres-1474992a7/",
-   bio:"Étudiant à l'Université Côte d'Azur. Co-construit Studia avec la conviction que le savoir doit circuler entre étudiants. Mon obsession : que chaque tuteur soit irréprochable et chaque vidéo réellement utile.",
+   bio:"Étudiant à l'Université Côte d'Azur. Co-construit Studia avec la conviction que le savoir doit circuler entre étudiants. Mon obsession : que chaque tuteur soit irréprochable et chaque corrigé réellement utile.",
    tags:["UCA","Économie & Gestion","Réseau tuteurs"]}
 ];
 const SOCIAL=[
@@ -1416,7 +1425,7 @@ function setupReveals(){
       obs.unobserve(e.target);
     });
   },{threshold:.15,rootMargin:"0px 0px -60px 0px"});
-  document.querySelectorAll(".reveal").forEach(el=>obs.observe(el));
+  document.querySelectorAll(".reveal:not(.in)").forEach(el=>obs.observe(el));
   // Barre de progression de scroll (handler nommé => pas de fuite entre les rendus).
   window.removeEventListener("scroll",_lpScroll);
   window.addEventListener("scroll",_lpScroll,{passive:true});
@@ -1621,7 +1630,19 @@ function render(){
   const _scrollKey=`${state.view}|${state.univ&&state.univ.id}|${state.faculte&&state.faculte.id}|${state.annee}|${state.matiere}|${state.item&&state.item.id}|${_ax.view}|${_ax.mat}|${_ax.niv}`;
   const _navChanged=_scrollKey!==state._scrollKey;state._scrollKey=_scrollKey;
   const app=document.getElementById("app");
-  if(state.view==="landing"){app.innerHTML=Landing();setTimeout(setupReveals,40);if(_navChanged)window.scrollTo(0,0);return;}
+  if(state.view==="landing"){
+    const _reRender=window._lpMounted&&!_navChanged;
+    const _prevIn=_reRender?[...document.querySelectorAll(".reveal")].map(el=>el.classList.contains("in")):null;
+    app.innerHTML=Landing(_reRender);
+    if(_reRender){
+      const _now=[...document.querySelectorAll(".reveal")];
+      _now.forEach((el,i)=>{if(_prevIn[i]){el.classList.add("in");const c=el.dataset.counter;if(c){const sn=el.querySelector(".stat-num");if(sn&&sn.firstChild)sn.firstChild.nodeValue=(+c).toLocaleString("fr-FR");}}});
+      setupReveals();
+    }else{setTimeout(setupReveals,40);}
+    window._lpMounted=true;
+    if(_navChanged)window.scrollTo(0,0);
+    return;
+  }
   if(state.view==="login"){app.innerHTML=Nav()+LoginView()+Footer();if(_navChanged)window.scrollTo(0,0);return;}
   let h=Nav();
   const v=state.view;
@@ -1664,7 +1685,7 @@ function render(){
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&state.pdfFullscreen)closeFullscreenPDF();});
 
 /* ===== Landing ===== */
-function Landing(){
+function Landing(skipAnim){
   const s=computeStats();
   const dup=TESTIMONIALS.concat(TESTIMONIALS); // doublé pour boucle infinie
   const nUsers=(state.publicStats&&state.publicStats.users)||0;
@@ -1676,16 +1697,16 @@ function Landing(){
   // Avatars décoratifs du badge (cercles abstraits, aucune identité inventée).
   const badgeAvs=["linear-gradient(135deg,#5BD974,#1E8C3C)","linear-gradient(135deg,#7BE0C0,#2A9D8F)","linear-gradient(135deg,#9AD86B,#3C8C1E)","linear-gradient(135deg,#5BC8D9,#1E6C8C)"];
   const offers={
-    Cours:{ic:"📘",lbl:"Cours",t:"Le cours, enfin clair",img:SITE_IMG.cours,d:"Les notions essentielles résumées et filmées par un major — sans remplissage, droit au but.",feats:["Les notions clés expliquées en vidéo","Définitions & formules à connaître","Les confusions fréquentes signalées","Disponible où tu veux, quand tu veux"]},
-    TD:{ic:"▶",lbl:"TD corrigés",t:"Les TD corrigés en vidéo",img:SITE_IMG.td,d:"Chaque TD repris étape par étape : tu vois la méthode, pas seulement la réponse.",feats:["La méthode avant le calcul","Résolution pas à pas, comme sur la copie","Les pièges classiques qui coûtent des points","Une variante pour t'auto-évaluer"]},
-    Examen:{ic:"📝",lbl:"Examens",t:"Les examens en conditions réelles",img:SITE_IMG.examen,d:"Les vrais sujets d'examen corrigés pour t'entraîner comme le jour J.",feats:["Sujets d'annales corrigés en vidéo","Le barème et ce qu'attend le correcteur","La stratégie de gestion du temps","Entraîne-toi avant le partiel, pas la veille"]}
+    Cours:{ic:"📘",lbl:"Cours",t:"Le cours, enfin clair",img:SITE_IMG.cours,d:"Les notions essentielles résumées et décryptées par un major — sans remplissage, droit au but.",feats:["Les notions clés expliquées pas à pas","Définitions & formules à connaître","Les confusions fréquentes signalées","Disponible où tu veux, quand tu veux"]},
+    TD:{ic:"▶",lbl:"TD corrigés",t:"Les TD corrigés pas à pas",img:SITE_IMG.td,d:"Chaque TD repris étape par étape : tu vois la méthode, pas seulement la réponse.",feats:["La méthode avant le calcul","Résolution pas à pas, comme sur la copie","Les pièges classiques qui coûtent des points","Une variante pour t'auto-évaluer"]},
+    Examen:{ic:"📝",lbl:"Examens",t:"Les examens en conditions réelles",img:SITE_IMG.examen,d:"Les vrais sujets d'examen corrigés pour t'entraîner comme le jour J.",feats:["Sujets d'annales corrigés pas à pas","Le barème et ce qu'attend le correcteur","La stratégie de gestion du temps","Entraîne-toi avant le partiel, pas la veille"]}
   };
   const points=[
     ["Les majors de ta propre promo","Chaque tuteur a réellement eu la note dans la matière qu'il explique. Pas un prof lointain : quelqu'un qui a passé le même partiel, dans la même fac, il y a peu."],
-    ["Tout est filmé, expliqué pas à pas","Cours, TD et examens : tout passe par la vidéo. Tu vois le raisonnement se construire, tu mets sur pause, tu reviens en arrière autant que tu veux."],
+    ["Corrigé pas à pas, pensé pour comprendre","Cours, TD et examens : chaque corrigé déroule le raisonnement, pas seulement la réponse. Tu vois la méthode se construire, étape par étape, et tu y reviens autant que tu veux."],
     ["Un espace personnel, adapté à ton année","Tu indiques ton université, ta filière et ton niveau — Studia t'ouvre exactement le bon programme, au bon moment du calendrier universitaire."],
     ["Un prix pensé pour le budget étudiant","Un pass semestriel sans engagement, bien plus accessible qu'une prépa privée. Tu changes ou tu résilies quand tu veux."],
-    ["Une qualité vérifiée avant publication","Chaque contenu est relu et validé. On préfère moins de vidéos, mais des vidéos réellement utiles et irréprochables."]
+    ["Une qualité vérifiée avant publication","Chaque contenu est relu et validé. On préfère moins de contenus, mais des corrigés réellement utiles et irréprochables."]
   ];
   const faqs=[
     ["C'est pour qui exactement ?","Pour tout étudiant en licence qui veut comprendre, pas seulement réviser la veille — que tu vises la mention ou que tu cherches à te remettre à flot après un décrochage."],
@@ -1697,7 +1718,7 @@ function Landing(){
   ];
   const steps=[
     ["1","Choisis ton université","Indique ta fac, ta filière et ton année. Studia t'ouvre exactement le bon programme — pas un catalogue où te perdre."],
-    ["2","Apprends avec les majors","Cours, TD et examens filmés, expliqués pas à pas par ceux qui ont eu la note. Pause, retour arrière, à ton rythme."],
+    ["2","Apprends avec les majors","Cours, TD et examens corrigés, expliqués pas à pas par ceux qui ont eu la note. Tu avances à ton rythme, tu reviens autant que tu veux."],
     ["3","Réussis tes partiels","Tu arrives à l'examen avec la méthode des meilleurs, déjà entraîné·e sur les annales. Le jour J, plus de surprises."]
   ];
   const plans=[
@@ -1705,14 +1726,14 @@ function Landing(){
     {nom:"Pass semestriel",amt:"39",per:"€",sub:"pour tout le semestre",save:"−15 € vs mensuel",reco:true,feats:["Accès illimité tout le semestre","Cours, TD & examens corrigés","Partiels blancs & QCM","Lives de révision avant partiels"],cta:"Choisir le semestre →",v:"ink",act:"startCheckout('semestre')"},
     {nom:"Mensuel",amt:"9",per:"€",sub:"par mois · sans engagement",feats:["Accès illimité","Tous les contenus corrigés","Partiels blancs & QCM","Résiliable en 1 clic"],cta:"Prendre au mois",v:"ghost",act:"startCheckout('mensuel')"}
   ];
-  return `<div class="fade"><div id="lp-progress"></div>${Nav()}
+  return `<div class="fade${skipAnim?' lp-norestart':''}"><div id="lp-progress"></div>${Nav()}
   <section class="lp-hero">
     <div class="lp-hero-bg"></div>
-    ${floatCards.map((c,i)=>`<div class="lp-float lp-f${i+1}"><div class="fa">${c[0]}</div><div><div class="ft">${c[1]}</div><div class="fm">${c[2]}</div></div><span class="note">▶ Vidéo</span></div>`).join("")}
+    ${floatCards.map((c,i)=>`<div class="lp-float lp-f${i+1}"><div class="fa">${c[0]}</div><div><div class="ft">${c[1]}</div><div class="fm">${c[2]}</div></div><span class="note">📄 Corrigé</span></div>`).join("")}
     <div class="wrap lp-hero-in">
       <div class="lp-badge"><div class="lp-avs">${badgeAvs.map(g=>`<span style="background:${g}"></span>`).join("")}</div><span style="display:inline-flex;align-items:center;gap:7px"><span style="color:#F5A623;letter-spacing:1px">★★★★★</span> Adoré par la 1re promo${nUsers>0?` · +${nUsers} inscrits`:""}</span></div>
       <h1 class="lp-h1">Comprendre, s'entraîner,<br/><i>réussir</i> sa licence.</h1>
-      <p class="lp-sub">Cours, TD et examens corrigés — expliqués en vidéo par les majors de ta promo. La méthode des meilleurs, à portée de tous.</p>
+      <p class="lp-sub">Cours, TD et examens corrigés — décryptés pas à pas par les majors de ta promo. La méthode des meilleurs, à portée de tous.</p>
       <div class="lp-cta"><button class="btn btn-ink btn-lg" onclick="nav('univs')">Choisir mon université →</button><button class="btn btn-ghost btn-lg" onclick="nav('tarifs')">Voir les tarifs</button></div>
       <div class="lp-trust"><span>✦ Sans engagement</span><span>✦ Accès immédiat</span><span>✦ Pensé pour le budget étudiant</span></div>
     </div>
@@ -1732,7 +1753,7 @@ function Landing(){
           <div class="stat reveal" data-counter="${nContenus}"><span class="stat-num">0${nContenus>0?'<span class="stat-suffix">+</span>':''}</span><div class="stat-label">Contenus publiés</div></div>
           <div class="stat reveal" data-counter="${nUsers}"><span class="stat-num">0${nUsers>0?'<span class="stat-suffix">+</span>':''}</span><div class="stat-label">Étudiants inscrits</div></div>
           <div class="stat reveal" data-counter="${nSubs}"><span class="stat-num">0${nSubs>0?'<span class="stat-suffix">+</span>':''}</span><div class="stat-label">Abonnés actifs</div></div>
-          <div class="stat reveal" data-counter="${s.heures}"><span class="stat-num">0<span class="stat-suffix">h</span></span><div class="stat-label">de vidéo</div></div>
+          <div class="stat reveal" data-counter="${s.heures}"><span class="stat-num">0<span class="stat-suffix">h</span></span><div class="stat-label">de méthode</div></div>
         </div>
       </div>
     </section>
