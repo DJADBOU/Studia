@@ -729,6 +729,24 @@ function defaultIconFor(id){const ic={cours:"📘",td:"▶",midterm:"🗒",exame
 async function restoreSession(){if(!sb)return;try{await loadAdmins();const{data}=await sb.auth.getUser();if(data&&data.user){const isAdmin=isAdminEmail(data.user.email);state.user={email:data.user.email,role:isAdmin?"admin":"student"};state.adminAuthed=isAdmin;showDbStatus(true);render();await checkSubscription();await loadProfile();await loadBookmarks();if(!isAdmin)loadMyApplication();render();maybeShowOnboarding();}}catch(e){}}
 async function loadHiddenMatieres(){if(!sb)return;try{const{data,error}=await sb.from("matieres_hidden").select("*");if(!error&&data){state.hiddenMatieres=new Set(data.map(r=>`${r.univ}|${r.faculte}|${r.annee}|${r.matiere}`));}}catch(e){}}
 async function dbHideMatiere(univ,faculte,annee,matiere){if(!sb)return false;try{const{error}=await sb.from("matieres_hidden").insert({univ,faculte,annee,matiere});if(error){toast("Échec : "+error.message,"err");return false;}toast("Matière masquée","ok");return true;}catch(e){toast("Erreur","err");return false;}}
+async function dbUnhideMatiere(univ,faculte,annee,matiere){if(!sb)return;try{await sb.from("matieres_hidden").delete().match({univ,faculte,annee,matiere});}catch(e){}}
+// Matières créées par l'admin, persistées (sinon elles disparaissent au rechargement tant qu'aucun contenu ne les "retient").
+async function loadCustomMatieres(){
+  if(!sb)return;
+  try{
+    const{data,error}=await sb.from("matieres_custom").select("*");
+    if(!error&&data){
+      if(!state.matSem)state.matSem={};
+      data.forEach(r=>{const f=facById(r.univ,r.faculte);if(f){if(!f.mat[r.annee])f.mat[r.annee]=[];if(!f.mat[r.annee].includes(r.matiere))f.mat[r.annee].push(r.matiere);state.matSem[matSemKey(r.univ,r.faculte,r.annee,r.matiere)]=r.semestre||"S1";}});
+      render();
+    }
+  }catch(e){}
+}
+async function dbAddMatiere(univ,faculte,annee,matiere,semestre){
+  if(!sb)return false;
+  try{const{error}=await sb.from("matieres_custom").upsert({univ,faculte,annee,matiere,semestre},{onConflict:"univ,faculte,annee,matiere"});if(error){toast("Échec sauvegarde : "+error.message,"err");return false;}return true;}catch(e){toast("Erreur","err");return false;}
+}
+async function dbDeleteCustomMatiere(univ,faculte,annee,matiere){if(!sb)return;try{await sb.from("matieres_custom").delete().match({univ,faculte,annee,matiere});}catch(e){}}
 function goCheckout(plan){const link=plan==="semestre"?CONFIG.STRIPE_LINK_SEMESTRE:CONFIG.STRIPE_LINK_MENSUEL;if(link){window.location.href=link;}else{state.modal=true;renderModal();}}
 async function authToken(){if(!sb)return null;try{const{data}=await sb.auth.getSession();return data&&data.session?data.session.access_token:null;}catch(e){return null;}}
 async function startCheckout(plan){
@@ -1471,7 +1489,20 @@ async function goProfile(){
   state.myStats=await loadMyStats();
   render();
 }
-function goProgramme(){ state.view = state.faculte?"programme":(state.univ?"facultes":"univs"); render(); }
+function goProgramme(){
+  // Étudiant (profil complet) : « Explorer » l'emmène directement sur SA licence
+  if(state.user&&!isAdminUser()&&hasProfile()&&state.profile){
+    const u=univById(state.profile.univ), f=u&&facById(state.profile.univ,state.profile.faculte);
+    if(u&&f){
+      state.univ=u;state.faculte=f;
+      const acc=myAccess();
+      state.annee=acc?acc.level:(state.profile.annee||"L1");
+      state.semestre=acc?acc.semester:(state.profile.semestre||"S1");
+      state.view="programme";render();return;
+    }
+  }
+  state.view = state.faculte?"programme":(state.univ?"facultes":"univs"); render();
+}
 function selectUniv(id){
   // Lock : étudiant non-admin avec profil → ne peut accéder qu'à son université
   if(state.user&&!isAdminUser()&&hasProfile()&&state.profile.univ&&id!==state.profile.univ){
@@ -1951,7 +1982,7 @@ function MobileMenu(){
   const isLockedStudent=state.user&&!isAdminUser()&&hasProfile();
   return `<div class="mobile-menu"><div class="wrap" style="padding-bottom:8px">
   ${showMyEspace?`<button onclick="goMyCourses()">Mon espace</button>`:""}
-  ${!isLockedStudent?`<button onclick="goProgramme()">${showMyEspace?"Explorer":"Programme"}</button>`:""}
+  <button onclick="goProgramme()">${showMyEspace?"Explorer":"Programme"}</button>
   <button onclick="nav('tarifs')">Tarifs</button>
   <button onclick="nav('tuteur')">Devenir tuteur</button>
   ${state.user&&!isAdminUser()?`<button onclick="openContribute()">📥 Proposer un doc</button>`:""}
@@ -2026,7 +2057,7 @@ function canAccess(annee,sem){const a=myAccess();return a?a.allowed(annee,sem):t
 function Nav(){
   const showMyEspace=!!state.user;
   const isLockedStudent=state.user&&!isAdminUser()&&hasProfile();
-  const showExplorer=!isLockedStudent;
+  const showExplorer=true;
   const searchBtn=`<button onclick="openSearch()" title="Recherche (Cmd+K)" style="background:none;border:none;cursor:pointer;color:var(--sub);padding:7px 10px;border-radius:7px;font-size:15px" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'">🔍</button>`;
   return `<div class="nav"><div class="wrap nav-in">
     <div onclick="nav('landing')" style="display:flex;align-items:center;gap:8px;cursor:pointer"><div class="logo">S</div><span style="font-weight:600;font-size:17px;color:var(--ink)">Studia</span></div>
@@ -2937,13 +2968,18 @@ function promptAddMatiere(){
   const sem=state.semestre||"S1";
   const nom=prompt(`Nom de la nouvelle matière (${sem}) :`);
   if(nom&&nom.trim()){
-    const name=nom.trim(), f=facById(state.a.univ.id,state.a.fac.id);
+    const name=nom.trim(), uid=state.a.univ.id, fid=state.a.fac.id, niv=state.a.niv, f=facById(uid,fid);
     if(f){
-      if(!f.mat[state.a.niv])f.mat[state.a.niv]=[];
-      if(!f.mat[state.a.niv].includes(name))f.mat[state.a.niv].push(name);
+      if(!f.mat[niv])f.mat[niv]=[];
+      if(!f.mat[niv].includes(name))f.mat[niv].push(name);
       if(!state.matSem)state.matSem={};
-      state.matSem[matSemKey(state.a.univ.id,state.a.fac.id,state.a.niv,name)]=sem;
+      const key=matSemKey(uid,fid,niv,name);
+      state.matSem[key]=sem;
+      // Si la matière avait été supprimée (masquée), on la ré-affiche
+      if(state.hiddenMatieres.has(key)){state.hiddenMatieres.delete(key);dbUnhideMatiere(uid,fid,niv,name);}
       render();
+      // Persistance en base → la matière survit au rechargement même sans contenu
+      dbAddMatiere(uid,fid,niv,name,sem).then(ok=>{if(ok)toast("Matière enregistrée","ok");});
     }
   }
 }
@@ -2964,6 +3000,7 @@ async function deleteMatiere(nom){
   const f=facById(a.univ.id,a.fac.id);
   if(f&&f.mat[a.niv])f.mat[a.niv]=f.mat[a.niv].filter(x=>x!==nom);
   if(state.matSem)delete state.matSem[matSemKey(a.univ.id,a.fac.id,a.niv,nom)];
+  dbDeleteCustomMatiere(a.univ.id,a.fac.id,a.niv,nom);
   render();
 }
 function aCrumb(){
@@ -3685,7 +3722,7 @@ function renderModal(){const r=document.getElementById("modalRoot");if(!state.mo
   r.innerHTML=`<div class="modal-bg" onclick="setModal(false)"><div class="modal fade" onclick="event.stopPropagation()"><div style="display:flex;justify-content:space-between"><span style="color:var(--accent)">✦</span><button style="background:none;border:none;color:var(--muted);cursor:pointer" onclick="setModal(false)">✕</button></div><h3 class="serif" style="font-size:26px;color:var(--ink);margin:12px 0 6px">Débloque tout Studia</h3><p style="font-size:14px;color:var(--sub);margin:0 0 18px;line-height:1.5">Accès illimité aux cours, TD et examens corrigés.</p><button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="startCheckout('semestre')">Pass semestriel — 39€</button><button class="btn btn-ghost" style="width:100%;margin-bottom:14px" onclick="startCheckout('mensuel')">Mensuel — 9€/mois</button>${hasStripe?'<p class="muted" style="text-align:center;margin:0">Paiement sécurisé via Stripe.</p>':`<div style="border-top:1px solid var(--border);padding-top:12px"><button class="btn btn-ink btn-sm" style="width:100%" onclick="subscribe()">Activer l'accès (démo)</button><p class="muted" style="text-align:center;margin-top:8px">Stripe non configuré — bouton démo.</p></div>`}</div></div>`;
 }
 
-window.addEventListener("load",()=>{if(typeof QRCode==="undefined")console.warn("QR lib non chargée");initSupabase();render();if(sb){Promise.all([loadAdmins(),loadCategories()]).then(()=>{loadContenus();loadHiddenMatieres();restoreSession();setupRealtime();loadPublicStats();});}});
+window.addEventListener("load",()=>{if(typeof QRCode==="undefined")console.warn("QR lib non chargée");initSupabase();render();if(sb){Promise.all([loadAdmins(),loadCategories()]).then(()=>{loadContenus();loadHiddenMatieres();loadCustomMatieres();restoreSession();setupRealtime();loadPublicStats();});}});
 </script>
 </body>
 </html>
