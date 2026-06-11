@@ -1337,6 +1337,7 @@ const state={
   categories:[],
   pdfFullscreen:false,
   semestre:"S1",
+  matSem:{},
   bookmarks:new Set(),
   currentNote:null,
   searchOpen:false,
@@ -1362,7 +1363,8 @@ const coursTpl=t=>[`Le cœur de « ${t} » résumé sans remplissage.`,"Les conc
 const univById=id=>UNIVS.find(u=>u.id===id);
 const facById=(uid,fid)=>{const u=univById(uid);return u&&u.facultes.find(f=>f.id===fid);};
 function semestreMatch(c,sem){if(!sem)return true;return (c.semestre||"S1")===sem;}
-const matieresFor=(uid,fid,annee,sem)=>{const f=facById(uid,fid);const m1=(f&&f.mat&&f.mat[annee])?f.mat[annee]:[];const m2=state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&semestreMatch(c,sem)).map(c=>c.matiere);return[...new Set([...m1,...m2])].filter(m=>!state.hiddenMatieres.has(`${uid}|${fid}|${annee}|${m}`))};
+const matSemKey=(uid,fid,annee,m)=>`${uid}|${fid}|${annee}|${m}`;
+const matieresFor=(uid,fid,annee,sem)=>{const f=facById(uid,fid);const m1=((f&&f.mat&&f.mat[annee])?f.mat[annee]:[]).filter(m=>{if(!sem)return true;const ms=state.matSem&&state.matSem[matSemKey(uid,fid,annee,m)];return !ms||ms===sem;});const m2=state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&semestreMatch(c,sem)).map(c=>c.matiere);return[...new Set([...m1,...m2])].filter(m=>!state.hiddenMatieres.has(`${uid}|${fid}|${annee}|${m}`))};
 const countMat=(uid,fid,annee,m,type,sem)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type&&semestreMatch(c,sem)).length;
 const itemsFor=(uid,fid,annee,m,type,sem)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type&&semestreMatch(c,sem));
 const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
@@ -2909,12 +2911,19 @@ function aGo(view){state.a.view=view;render();}
 function aPickUniv(id){const u=univById(id);if(!u||!u.actif)return;state.a.univ=u;state.a.view="fac";render();}
 function aPickFac(fid){state.a.fac=facById(state.a.univ.id,fid);state.a.view="niv";render();}
 function aPickNiv(n){state.a.niv=n;state.a.view="mat";render();}
-function aPickMat(idx){const m=matieresFor(state.a.univ.id,state.a.fac.id,state.a.niv)[idx];if(m==null)return;state.a.mat=m;const cats=catsFor(state.a.univ.id,state.a.fac.id,state.a.niv,m);state.a.tab=(cats[0]||{}).id||null;state.a.view="manage";render();}
+function aPickMat(idx){const m=matieresFor(state.a.univ.id,state.a.fac.id,state.a.niv,state.semestre||"S1")[idx];if(m==null)return;state.a.mat=m;const cats=catsFor(state.a.univ.id,state.a.fac.id,state.a.niv,m);state.a.tab=(cats[0]||{}).id||null;state.a.view="manage";render();}
 function promptAddMatiere(){
-  const nom=prompt("Nom de la nouvelle matière :");
+  const sem=state.semestre||"S1";
+  const nom=prompt(`Nom de la nouvelle matière (${sem}) :`);
   if(nom&&nom.trim()){
-    const f=facById(state.a.univ.id,state.a.fac.id);
-    if(f){if(!f.mat[state.a.niv])f.mat[state.a.niv]=[];f.mat[state.a.niv].push(nom.trim());render();}
+    const name=nom.trim(), f=facById(state.a.univ.id,state.a.fac.id);
+    if(f){
+      if(!f.mat[state.a.niv])f.mat[state.a.niv]=[];
+      if(!f.mat[state.a.niv].includes(name))f.mat[state.a.niv].push(name);
+      if(!state.matSem)state.matSem={};
+      state.matSem[matSemKey(state.a.univ.id,state.a.fac.id,state.a.niv,name)]=sem;
+      render();
+    }
   }
 }
 async function deleteMatiere(nom){
@@ -2933,6 +2942,7 @@ async function deleteMatiere(nom){
   // Enlève aussi de la liste hardcodée (en mémoire)
   const f=facById(a.univ.id,a.fac.id);
   if(f&&f.mat[a.niv])f.mat[a.niv]=f.mat[a.niv].filter(x=>x!==nom);
+  if(state.matSem)delete state.matSem[matSemKey(a.univ.id,a.fac.id,a.niv,nom)];
   render();
 }
 function aCrumb(){
@@ -2974,8 +2984,9 @@ function AdminConsole(){
   } else if(a.view==="niv"){
     body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom}</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">${["L1","L2","L3"].map(n=>`<div class="card card-h" style="padding:24px;text-align:center" onclick="aPickNiv('${n}')"><div class="serif" style="font-size:32px;color:var(--ink)">${n}</div><div class="muted">${state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===a.fac.id&&c.annee===n).length} contenus</div></div>`).join("")}</div>`;
   } else if(a.view==="mat"){
-    const mats=matieresFor(a.univ.id,a.fac.id,a.niv);
-    body=`<h2 class="serif" style="font-size:28px;color:var(--ink);margin:0 0 18px">${a.fac.nom} · ${a.niv}</h2><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${mats.map((m,i)=>{const n=state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===a.fac.id&&c.annee===a.niv&&c.matiere===m).length;return `<div class="card" style="padding:20px;position:relative"><div class="card-h" style="cursor:pointer" onclick="aPickMat(${i})"><div style="display:flex;justify-content:space-between"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0;padding-right:24px">${esc(m)}</h3><span style="color:var(--muted)">›</span></div><div class="muted" style="margin-top:8px">${n} contenus</div></div><button title="Supprimer la matière" onclick="event.stopPropagation();deleteMatiere('${esc(m).replace(/'/g,"\\'")}')" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--muted);font-size:16px;width:28px;height:28px;border-radius:6px;cursor:pointer" onmouseover="this.style.background='#FBEDEC';this.style.color='#B4453A'" onmouseout="this.style.background='none';this.style.color='var(--muted)'">×</button></div>`;}).join("")}<div class="card card-h" style="padding:20px;display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--borderStrong);background:transparent;cursor:pointer" onclick="promptAddMatiere()"><span style="color:var(--accentDark);font-weight:500">+ Ajouter une matière</span></div></div>`;
+    const sem=state.semestre||"S1";
+    const mats=matieresFor(a.univ.id,a.fac.id,a.niv,sem);
+    body=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin:0 0 18px"><h2 class="serif" style="font-size:28px;color:var(--ink);margin:0">${a.fac.nom} · ${a.niv}</h2><div class="seg sm">${["S1","S2"].map(s=>`<button class="${sem===s?"on":""}" onclick="state.semestre='${s}';render()">${s}</button>`).join("")}</div></div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${mats.map((m,i)=>{const n=state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===a.fac.id&&c.annee===a.niv&&c.matiere===m&&semestreMatch(c,sem)).length;return `<div class="card" style="padding:20px;position:relative"><div class="card-h" style="cursor:pointer" onclick="aPickMat(${i})"><div style="display:flex;justify-content:space-between"><h3 style="font-size:16px;color:var(--ink);font-weight:600;margin:0;padding-right:24px">${esc(m)}</h3><span style="color:var(--muted)">›</span></div><div class="muted" style="margin-top:8px">${n} contenu${n>1?"s":""} · ${sem}</div></div><button title="Supprimer la matière" onclick="event.stopPropagation();deleteMatiere('${esc(m).replace(/'/g,"\\'")}')" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--muted);font-size:16px;width:28px;height:28px;border-radius:6px;cursor:pointer" onmouseover="this.style.background='#FBEDEC';this.style.color='#B4453A'" onmouseout="this.style.background='none';this.style.color='var(--muted)'">×</button></div>`;}).join("")}<div class="card card-h" style="padding:20px;display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--borderStrong);background:transparent;cursor:pointer" onclick="promptAddMatiere()"><span style="color:var(--accentDark);font-weight:500">+ Ajouter une matière (${sem})</span></div></div>`;
   } else {
     body=AdminManage();
   }
