@@ -1008,7 +1008,7 @@ async function submitContribution(){
   if(theFile.size>20*1024*1024){toast("Fichier trop lourd (max 20 Mo)","err");return;}
   state._contribBusy=true;renderContribute();
   try{const{data:u}=await sb.auth.getUser();if(!u||!u.user){state._contribBusy=false;renderContribute();return;}
-    const ext=(theFile.name.match(/\.[^.]+$/)||[""])[0]||"";
+    const ext=((theFile.name.match(/\.[a-z0-9]+$/i)||[""])[0]||"").toLowerCase();
     const path=`${u.user.id}/${Date.now()}_${Math.random().toString(36).slice(2,7)}${ext}`;
     const{error:upErr}=await sb.storage.from("contributions").upload(path,theFile,{contentType:theFile.type||undefined});
     if(upErr){state._contribBusy=false;renderContribute();toast("Échec upload : "+upErr.message,"err",5000);return;}
@@ -1043,11 +1043,11 @@ function AdminContributionsView(){
       ${c.description?`<div style="margin-top:8px;font-size:13.5px;color:var(--sub);line-height:1.5;background:#FBFBFA;padding:10px 12px;border-radius:8px">${esc(c.description)}</div>`:""}
       <div class="muted" style="font-size:11.5px;margin-top:6px">Proposé par ${esc(c.email||"?")} · ${fmtRelativeDate(c.created_at)} · 📎 ${esc(c.file_name||"fichier")}</div>
       <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
-        <button class="btn btn-ink btn-sm" onclick="downloadContribution('${esc(c.file_path)}')">⬇ Télécharger le PDF</button>
+        <button class="btn btn-ink btn-sm" onclick="downloadContribution('${jsAttr(c.file_path)}')">⬇ Télécharger le PDF</button>
         ${st!=="processed"?`<button class="btn btn-accent btn-sm" onclick="updateContribution(${c.id},'processed')">✓ Marquer traité</button>`:""}
         ${st!=="rejected"?`<button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="updateContribution(${c.id},'rejected')">✕ Rejeter</button>`:""}
         ${st!=="pending"?`<button class="btn btn-ghost btn-sm" onclick="updateContribution(${c.id},'pending')">↺ Remettre en attente</button>`:""}
-        <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="deleteContribution(${c.id},'${esc(c.file_path)}')">🗑 Supprimer</button>
+        <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="deleteContribution(${c.id},'${jsAttr(c.file_path)}')">🗑 Supprimer</button>
       </div>
     </div>`;}).join("")}</div>`;
 }
@@ -1394,7 +1394,10 @@ const matSemKey=(uid,fid,annee,m)=>`${uid}|${fid}|${annee}|${m}`;
 const matieresFor=(uid,fid,annee,sem)=>{const f=facById(uid,fid);const m1=((f&&f.mat&&f.mat[annee])?f.mat[annee]:[]).filter(m=>{if(!sem)return true;const ms=state.matSem&&state.matSem[matSemKey(uid,fid,annee,m)];return !ms||ms===sem;});const m2=state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&semestreMatch(c,sem)).map(c=>c.matiere);return[...new Set([...m1,...m2])].filter(m=>!state.hiddenMatieres.has(`${uid}|${fid}|${annee}|${m}`))};
 const countMat=(uid,fid,annee,m,type,sem)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type&&semestreMatch(c,sem)).length;
 const itemsFor=(uid,fid,annee,m,type,sem)=>state.contenus.filter(c=>c.univ===uid&&c.faculte===fid&&c.annee===annee&&c.matiere===m&&c.type===type&&semestreMatch(c,sem));
-const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+// Échappe une valeur destinée à une chaîne JS DANS un handler inline (onclick="fn('...')").
+// On échappe d'abord le JS (\ et '), puis le HTML — ordre nécessaire pour survivre au décodage HTML de l'attribut.
+const jsAttr=s=>(s==null?"":String(s)).replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\r?\n/g,"\\n");
 function univLogoHTML(u){
   const url=UNIV_LOGOS[u.id];
   if(url)return `<div class="ulogo"><img src="${url}" alt="${esc(u.nom)}" onerror="const p=this.parentElement;p.classList.add('fallback');p.innerHTML='${u.nom[0]}'"/></div>`;
