@@ -3,7 +3,26 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Studia</title>
+<title>Studia — Cours, TD & examens corrigés par les majors</title>
+<meta name="description" content="Cours, TD et examens corrigés et expliqués par les majors de ta promo. Comprendre, s'entraîner, réussir sa licence — la méthode des meilleurs, à portée de tous."/>
+<meta name="theme-color" content="#34C759"/>
+<meta name="robots" content="index, follow"/>
+<meta name="author" content="Studia"/>
+<link rel="canonical" href="https://djadbou.github.io/Studia/"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%2334C759'/%3E%3Ctext x='16' y='23' font-size='21' fill='white' text-anchor='middle' font-family='Georgia' font-weight='700'%3ES%3C/text%3E%3C/svg%3E"/>
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="Studia"/>
+<meta property="og:locale" content="fr_FR"/>
+<meta property="og:url" content="https://djadbou.github.io/Studia/"/>
+<meta property="og:title" content="Studia — La méthode des majors de ta promo"/>
+<meta property="og:description" content="Cours, TD et examens corrigés par les meilleurs étudiants. Comprendre, s'entraîner, réussir sa licence."/>
+<meta property="og:image" content="https://aswkkhdeiedjlxydxzbn.supabase.co/storage/v1/object/public/assets/og.jpg"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Studia — La méthode des majors de ta promo"/>
+<meta name="twitter:description" content="Cours, TD et examens corrigés par les meilleurs étudiants de ta promo."/>
+<meta name="twitter:image" content="https://aswkkhdeiedjlxydxzbn.supabase.co/storage/v1/object/public/assets/og.jpg"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
@@ -36,6 +55,11 @@ a{color:inherit;text-decoration:none}
 .btn:active{transform:translateY(0);transition:transform .08s}
 .btn-ink{background:var(--ink);color:#fff}.btn-accent{background:var(--accent);color:#fff}
 .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--borderStrong)}
+.btn-danger{background:#B4453A;color:#fff}
+.cookie-banner{position:fixed;left:16px;right:16px;bottom:16px;z-index:250;max-width:580px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);padding:14px 16px;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;animation:toastIn .35s ease}
+.cookie-banner p{margin:0;font-size:13px;color:var(--sub);line-height:1.5;flex:1;min-width:220px}
+.cookie-banner p b{color:var(--ink);font-weight:600}
+.cookie-banner a{color:var(--accentDark);cursor:pointer;text-decoration:underline}
 .btn-sm{padding:6px 12px;font-size:13px}
 .btn-lg{padding:12px 22px;font-size:15px}
 .input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--borderStrong);background:var(--bg);font-size:14px;color:var(--ink);outline:none}
@@ -540,7 +564,7 @@ async function checkSubscription(){if(!sb||!state.user)return;try{const{data:u}=
 async function loadAdmins(){if(!sb)return;try{const{data,error}=await sb.from("admins").select("email");if(!error&&data){ADMIN_EMAILS=new Set([ADMIN_EMAIL,...data.map(r=>r.email)]);}}catch(e){}}
 /* ===== Reset password ===== */
 async function resetPassword(){
-  const email=prompt("Ton email pour recevoir le lien de réinitialisation :");
+  const email=await uiPrompt("Entre ton adresse email, on t'envoie un lien de réinitialisation.",{title:"Mot de passe oublié",placeholder:"ton@email.fr",confirmText:"Envoyer le lien"});
   if(!email||!email.trim())return;
   if(!sb){toast("Pas de connexion","err");return;}
   try{
@@ -693,7 +717,7 @@ async function openDoc(path,filename){
 async function deleteDoc(kind){
   if(!sb||!state.user)return;
   const label=kind==="cv"?"CV":"relevé de notes";
-  if(!confirm("Supprimer ton "+label+" ?"))return;
+  if(!await uiConfirm("Ce document sera retiré de ton espace.",{title:"Supprimer ton "+label+" ?",confirmText:"Supprimer",danger:true}))return;
   const field=kind==="cv"?"cv_path":"releve_path";
   const path=(state.profile||{})[field];
   try{
@@ -756,8 +780,8 @@ async function startCheckout(plan){
   goCheckout(plan);
 }
 async function downloadProtected(id){
-  if(!(CONFIG.FUNCTIONS_URL&&sb&&state.user)){alert("Téléchargement protégé disponible une fois le backend connecté (voir le README).");return;}
-  try{const t=await authToken();const res=await fetch(CONFIG.FUNCTIONS_URL+"/download?id="+encodeURIComponent(id),{headers:{"Authorization":"Bearer "+t}});if(!res.ok){alert("Accès refusé : abonnement requis.");return;}const blob=await res.blob();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="studia-"+id;document.body.appendChild(a);a.click();a.remove();}catch(e){alert("Erreur : "+e.message);}
+  if(!(CONFIG.FUNCTIONS_URL&&sb&&state.user)){toast("Téléchargement disponible une fois le paiement activé.","warn",4000);return;}
+  try{const t=await authToken();const res=await fetch(CONFIG.FUNCTIONS_URL+"/download?id="+encodeURIComponent(id),{headers:{"Authorization":"Bearer "+t}});if(!res.ok){toast("Accès refusé : abonnement requis.","err",4000);return;}const blob=await res.blob();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="studia-"+id;document.body.appendChild(a);a.click();a.remove();}catch(e){toast("Erreur : "+e.message,"err",4000);}
 }
 
 /* ===== Supabase : persistance contenus ===== */
@@ -878,7 +902,7 @@ async function postComment(contenu_id,texte){
 }
 async function deleteComment(id){
   if(!sb)return;
-  if(!confirm("Supprimer ce commentaire ?"))return;
+  if(!await uiConfirm("Ce commentaire sera supprimé.",{title:"Supprimer ce commentaire ?",confirmText:"Supprimer",danger:true}))return;
   try{const{error}=await sb.from("comments").delete().eq("id",id);if(error){toast(error.message,"err");return;}toast("Commentaire supprimé","ok");state.comments=(state.comments||[]).filter(c=>c.id!==id);render();}catch(e){}
 }
 async function submitComment(contenu_id){
@@ -893,7 +917,7 @@ async function submitComment(contenu_id){
 /* ===== Signaler une erreur (feedback par sujet) ===== */
 async function reportError(contenu_id){
   if(!sb||!state.user){toast("Connecte-toi pour signaler une erreur","warn");nav("login");return;}
-  const msg=prompt("Décris l'erreur repérée (faute, mauvaise réponse, page manquante, lien cassé…) :");
+  const msg=await uiPrompt("Décris l'erreur repérée : faute, mauvaise réponse, page manquante, lien cassé…",{title:"Signaler une erreur",placeholder:"Ex. la réponse de la Q3 est fausse",confirmText:"Envoyer"});
   if(!msg||!msg.trim())return;
   try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
     const{error}=await sb.from("signalements").insert({contenu_id,user_id:u.user.id,email:state.user.email,message:msg.trim()});
@@ -934,7 +958,7 @@ async function resolveSignalement(id,status){
   try{await sb.from("signalements").update({status:status||"resolved"}).eq("id",id);loadSignalements();}catch(e){toast("Erreur","err");}
 }
 async function deleteSignalement(id){
-  if(!sb)return;if(!confirm("Supprimer définitivement ce signalement ?"))return;
+  if(!sb)return;if(!await uiConfirm("Ce signalement sera définitivement supprimé.",{title:"Supprimer le signalement ?",confirmText:"Supprimer",danger:true}))return;
   try{await sb.from("signalements").delete().eq("id",id);state._signalements=(state._signalements||[]).filter(s=>s.id!==id);render();}catch(e){toast("Erreur","err");}
 }
 function adminOpenContenu(id){const c=state.contenus.find(x=>x.id===id);if(!c)return;state.univ=univById(c.univ);state.faculte=facById(c.univ,c.faculte);state.matiere=c.matiere;state.annee=c.annee;state.semestre=c.semestre||"S1";openItem(id);}
@@ -1083,7 +1107,7 @@ async function updateContribution(id,status){
   }
 }
 async function deleteContribution(id,path){
-  if(!sb)return;if(!confirm("Supprimer définitivement cette proposition et son fichier ?"))return;
+  if(!sb)return;if(!await uiConfirm("La proposition et son fichier seront supprimés définitivement.",{title:"Supprimer cette proposition ?",confirmText:"Supprimer",danger:true}))return;
   const before=state._contributions||[];
   const removed=before.find(c=>c.id===id);
   state._contributions=before.filter(c=>c.id!==id);render(); // optimiste
@@ -1398,6 +1422,45 @@ const esc=s=>(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&g
 // Échappe une valeur destinée à une chaîne JS DANS un handler inline (onclick="fn('...')").
 // On échappe d'abord le JS (\ et '), puis le HTML — ordre nécessaire pour survivre au décodage HTML de l'attribut.
 const jsAttr=s=>(s==null?"":String(s)).replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\r?\n/g,"\\n");
+/* ===== Pop-ups branded (remplacent confirm/prompt/alert du navigateur) ===== */
+function __uiRoot(){let r=document.getElementById("uiModalRoot");if(!r){r=document.createElement("div");r.id="uiModalRoot";document.body.appendChild(r);}return r;}
+function uiConfirm(message,opts){opts=opts||{};
+  return new Promise(res=>{
+    const root=__uiRoot();
+    const title=opts.title||"Confirmer",confirmText=opts.confirmText||"Confirmer",cancelText=opts.cancelText||"Annuler",danger=!!opts.danger,icon=opts.icon||(danger?"🗑️":"❓");
+    const close=v=>{root.innerHTML="";document.removeEventListener("keydown",onKey);res(v);};
+    const onKey=e=>{if(e.key==="Escape")close(false);else if(e.key==="Enter")close(true);};
+    document.addEventListener("keydown",onKey);window.__uiClose=close;
+    root.innerHTML=`<div class="modal-bg" onclick="if(event.target===this)__uiClose(false)"><div class="modal fade" role="dialog" aria-modal="true" style="max-width:420px;text-align:center">
+      <div style="font-size:30px;margin-bottom:10px">${icon}</div>
+      <h3 style="font-family:var(--serif);font-size:23px;color:var(--ink);margin:0 0 8px;letter-spacing:-.3px">${esc(title)}</h3>
+      <p style="font-size:14.5px;color:var(--sub);line-height:1.55;margin:0 0 22px">${esc(message)}</p>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn btn-ghost" onclick="__uiClose(false)">${esc(cancelText)}</button>
+        <button class="btn ${danger?'btn-danger':'btn-ink'}" onclick="__uiClose(true)">${esc(confirmText)}</button>
+      </div></div></div>`;
+  });
+}
+function uiPrompt(message,opts){opts=opts||{};
+  return new Promise(res=>{
+    const root=__uiRoot();
+    const title=opts.title||"",placeholder=opts.placeholder||"",value=opts.value||"",confirmText=opts.confirmText||"Valider",cancelText=opts.cancelText||"Annuler";
+    const close=v=>{root.innerHTML="";document.removeEventListener("keydown",onKey);res(v);};
+    const onKey=e=>{if(e.key==="Escape")close(null);};
+    const submit=()=>{const el=document.getElementById("__uiInput");close(el?el.value:null);};
+    document.addEventListener("keydown",onKey);window.__uiClose=close;window.__uiSubmit=submit;
+    root.innerHTML=`<div class="modal-bg" onclick="if(event.target===this)__uiClose(null)"><div class="modal fade" role="dialog" aria-modal="true" style="max-width:440px">
+      ${title?`<h3 style="font-family:var(--serif);font-size:22px;color:var(--ink);margin:0 0 6px;letter-spacing:-.3px">${esc(title)}</h3>`:""}
+      <p style="font-size:14px;color:var(--sub);line-height:1.5;margin:0 0 14px">${esc(message)}</p>
+      <input id="__uiInput" class="input" placeholder="${esc(placeholder)}" value="${esc(value)}" style="margin-bottom:18px"/>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="__uiClose(null)">${esc(cancelText)}</button>
+        <button class="btn btn-ink" onclick="__uiSubmit()">${esc(confirmText)}</button>
+      </div></div></div>`;
+    const inp=document.getElementById("__uiInput");
+    if(inp){inp.focus();try{inp.select();}catch(e){}inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();submit();}});}
+  });
+}
 function univLogoHTML(u){
   const url=UNIV_LOGOS[u.id];
   if(url)return `<div class="ulogo"><img src="${url}" alt="${esc(u.nom)}" onerror="const p=this.parentElement;p.classList.add('fallback');p.innerHTML='${u.nom[0]}'"/></div>`;
@@ -1433,6 +1496,19 @@ function animateCounter(el,target,dur=1400){
     if(p<1)requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
+}
+function updateLandingStats(){
+  const grid=document.querySelector(".stats-grid");if(!grid)return;
+  const s=computeStats();
+  const nUsers=(state.publicStats&&state.publicStats.users)||0;
+  const nContenus=(state.publicStats&&state.publicStats.contenus)||(s.cours+s.td+s.examens);
+  const nSubs=(state.publicStats&&state.publicStats.subscribers)||0;
+  const vals=[nContenus,nUsers,nSubs,s.heures];
+  grid.querySelectorAll(".stat[data-counter]").forEach((el,i)=>{
+    if(i>=vals.length)return;
+    el.dataset.counter=vals[i];
+    if(el.classList.contains("in")){const sn=el.querySelector(".stat-num");if(sn&&sn.firstChild)sn.firstChild.nodeValue=(+vals[i]).toLocaleString("fr-FR");}
+  });
 }
 function setupReveals(){
   if(!window.IntersectionObserver)return;
@@ -1665,14 +1741,12 @@ function render(){
   const _navChanged=_scrollKey!==state._scrollKey;state._scrollKey=_scrollKey;
   const app=document.getElementById("app");
   if(state.view==="landing"){
-    const _reRender=window._lpMounted&&!_navChanged;
-    const _prevIn=_reRender?[...document.querySelectorAll(".reveal")].map(el=>el.classList.contains("in")):null;
-    app.innerHTML=Landing(_reRender);
-    if(_reRender){
-      const _now=[...document.querySelectorAll(".reveal")];
-      _now.forEach((el,i)=>{if(_prevIn[i]){el.classList.add("in");const c=el.dataset.counter;if(c){const sn=el.querySelector(".stat-num");if(sn&&sn.firstChild)sn.firstChild.nodeValue=(+c).toLocaleString("fr-FR");}}});
-      setupReveals();
-    }else{setTimeout(setupReveals,40);}
+    // Données mises à jour alors qu'on est DÉJÀ sur la landing (boot async, realtime) :
+    // on ne reconstruit PAS le DOM — sinon les logos/images sont recréés → clignotement.
+    // On rafraîchit seulement les compteurs de stats, en place.
+    if(window._lpMounted&&!_navChanged){updateLandingStats();return;}
+    app.innerHTML=Landing();
+    setTimeout(setupReveals,40);
     window._lpMounted=true;
     if(_navChanged)window.scrollTo(0,0);
     return;
@@ -2758,9 +2832,9 @@ async function submitProfile(){
   if(r.ok){state.editProfile=false;state._profForm=null;render();}
 }
 async function changePassword(){
-  const newPass=prompt("Nouveau mot de passe (6+ caractères) :");
-  if(!newPass||newPass.length<6){alert("Mot de passe trop court.");return;}
-  if(!sb){alert("Pas de connexion.");return;}
+  const newPass=await uiPrompt("Choisis un nouveau mot de passe (6 caractères minimum).",{title:"Changer de mot de passe",placeholder:"Nouveau mot de passe",confirmText:"Mettre à jour"});
+  if(!newPass||newPass.length<6){toast("Mot de passe trop court (6 caractères min.)","err");return;}
+  if(!sb){toast("Pas de connexion.","err");return;}
   try{const{error}=await sb.auth.updateUser({password:newPass});if(error){toast(error.message,"err");return;}toast("✓ Mot de passe changé","ok");}catch(e){toast("Erreur","err");}
 }
 
@@ -2967,9 +3041,9 @@ function aPickUniv(id){const u=univById(id);if(!u||!u.actif)return;state.a.univ=
 function aPickFac(fid){state.a.fac=facById(state.a.univ.id,fid);state.a.view="niv";render();}
 function aPickNiv(n){state.a.niv=n;state.a.view="mat";render();}
 function aPickMat(idx){const m=matieresFor(state.a.univ.id,state.a.fac.id,state.a.niv,state.semestre||"S1")[idx];if(m==null)return;state.a.mat=m;const cats=catsFor(state.a.univ.id,state.a.fac.id,state.a.niv,m);state.a.tab=(cats[0]||{}).id||null;state.a.view="manage";render();}
-function promptAddMatiere(){
+async function promptAddMatiere(){
   const sem=state.semestre||"S1";
-  const nom=prompt(`Nom de la nouvelle matière (${sem}) :`);
+  const nom=await uiPrompt("Donne un nom à la matière.",{title:`Nouvelle matière · ${sem}`,placeholder:"Ex. Microéconomie",confirmText:"Créer la matière"});
   if(nom&&nom.trim()){
     const name=nom.trim(), uid=state.a.univ.id, fid=state.a.fac.id, niv=state.a.niv, f=facById(uid,fid);
     if(f){
@@ -2989,8 +3063,8 @@ function promptAddMatiere(){
 async function deleteMatiere(nom){
   const a=state.a;
   const items=state.contenus.filter(c=>c.univ===a.univ.id&&c.faculte===a.fac.id&&c.annee===a.niv&&c.matiere===nom);
-  const msg=items.length?`Supprimer « ${nom} » et ses ${items.length} contenu${items.length>1?"s":""} ? Action définitive.`:`Supprimer « ${nom} » ? Action définitive.`;
-  if(!confirm(msg))return;
+  const msg=items.length?`Cette action supprimera aussi ses ${items.length} contenu${items.length>1?"s":""}. C'est définitif.`:`Cette matière sera supprimée. C'est définitif.`;
+  if(!await uiConfirm(msg,{title:`Supprimer « ${nom} » ?`,confirmText:"Supprimer",danger:true}))return;
   // Supprime tous les contenus de cette matière en DB + storage
   for(const c of items){
     if(c.source!=="seed")await dbDeleteContenu(c.id,c.file_path);
@@ -3173,13 +3247,13 @@ async function updateApplication(id,status){
 }
 async function deleteApplication(id){
   if(!sb)return;
-  if(!confirm("Supprimer définitivement cette candidature ? (à faire une fois traitée, pour garder l'espace propre)"))return;
+  if(!await uiConfirm("À faire une fois la candidature traitée, pour garder l'espace propre. C'est définitif.",{title:"Supprimer cette candidature ?",confirmText:"Supprimer",danger:true}))return;
   if(state._apps){state._apps=state._apps.filter(a=>a.id!==id);render();}
   try{const{error}=await sb.from("tutor_applications").delete().eq("id",id);if(error){toast("Erreur : "+error.message,"err",4000);loadAdminApplications();return;}toast("Candidature supprimée","ok",2000);}catch(e){toast("Erreur","err");loadAdminApplications();}
 }
 
 async function banUser(user_id,nom){
-  if(!confirm(`Désactiver le compte de "${nom}" ? Le compte sera marqué inactif mais pas supprimé.`))return;
+  if(!await uiConfirm(`Le compte sera marqué inactif (pas supprimé).`,{title:`Désactiver le compte de « ${nom} » ?`,confirmText:"Désactiver",danger:true}))return;
   if(!sb)return;
   try{await sb.from("profiles").update({bio:"[DÉSACTIVÉ]",updated_at:new Date().toISOString()}).eq("user_id",user_id);toast("Compte marqué désactivé","ok");loadAdminUsers();}catch(e){toast("Erreur","err");}
 }
@@ -3284,20 +3358,20 @@ async function deleteCategoryConfirm(sc,id){
   const s=_parseScope(sc);
   const inUse=state.contenus.filter(c=>c.univ===s.univ&&c.faculte===s.faculte&&c.annee===s.annee&&c.matiere===s.matiere&&c.type===id).length;
   const msg=inUse?`${inUse} contenu(s) de « ${s.matiere} » utilisent « ${id} ». Supprimer la rubrique quand même ? (Les contenus garderont le type « ${id} » mais l'onglet disparaîtra.)`:`Supprimer la rubrique « ${id} » de « ${s.matiere} » ?`;
-  if(!confirm(msg))return;
+  if(!await uiConfirm(msg,{title:"Supprimer la rubrique ?",confirmText:"Supprimer",danger:true}))return;
   await dbDeleteCategory(Object.assign({id},s));
   state.categories=(state.categories||[]).filter(c=>!(c.univ===s.univ&&c.faculte===s.faculte&&c.annee===s.annee&&c.matiere===s.matiere&&c.id===id));
   if(state.a&&state.a.tab===id)state.a.tab=(catsFor(s.univ,s.faculte,s.annee,s.matiere)[0]||{}).id||null;
   render();
 }
-function openNewCategory(sc){
+async function openNewCategory(sc){
   const s=_parseScope(sc);
-  const id=prompt("ID de la rubrique (un mot court, sans espace ni accent — ex. 'Cours', 'TD', 'Partiel', 'Annale') :");
+  const id=await uiPrompt("Un mot court, sans espace ni accent (ex. Cours, TD, Partiel, Annale).",{title:"Nouvelle rubrique",placeholder:"Ex. TD",confirmText:"Suivant"});
   if(!id||!id.trim())return;
   const safeId=id.trim().replace(/\s+/g,"");
   if((state.categories||[]).find(c=>c.univ===s.univ&&c.faculte===s.faculte&&c.annee===s.annee&&c.matiere===s.matiere&&c.id===safeId)){toast("Cette rubrique existe déjà pour cette matière","warn");return;}
-  const label=prompt("Libellé affiché à l'étudiant :",safeId)||safeId;
-  const icon=prompt("Icône (emoji) :",defaultIconFor(safeId))||"📄";
+  const label=(await uiPrompt("Le libellé affiché à l'étudiant.",{title:"Libellé de la rubrique",value:safeId,confirmText:"Suivant"}))||safeId;
+  const icon=(await uiPrompt("Une icône emoji pour la rubrique.",{title:"Icône de la rubrique",value:defaultIconFor(safeId),confirmText:"Créer la rubrique"}))||"📄";
   const position=catsFor(s.univ,s.faculte,s.annee,s.matiere).reduce((m,c)=>Math.max(m,c.position||0),0)+1;
   const newC=Object.assign({},s,{id:safeId,label,icon,position});
   dbUpsertCategory(newC).then(r=>{if(r&&r.ok){state.categories.push(newC);if(state.a&&!state.a.tab)state.a.tab=safeId;render();}});
@@ -3409,7 +3483,7 @@ function updField(id,k,v){
 }
 async function delItem(id){
   const c=state.contenus.find(x=>x.id===id);
-  if(!confirm("Supprimer ce contenu ? Cette action est définitive."))return;
+  if(!await uiConfirm("Ce contenu sera supprimé définitivement.",{title:"Supprimer ce contenu ?",confirmText:"Supprimer",danger:true}))return;
   if(c&&c.source!=="seed")await dbDeleteContenu(id,c.file_path,c.corrige_path);
   state.contenus=state.contenus.filter(x=>x.id!==id);
   render();
@@ -3660,9 +3734,9 @@ async function saveNewContenu(){
   const a=state.a;
   const get=id=>(document.getElementById(id)||{}).value||"";
   const titre=get("ncTitre").trim();
-  if(!titre){alert("Titre requis.");return;}
+  if(!titre){toast("Titre requis.","err");return;}
   const ncType=get("ncType")||a.tab;
-  if(!ncType){alert("Choisis une rubrique (crée-en une d'abord pour cette matière).");return;}
+  if(!ncType){toast("Choisis une rubrique (crée-en une d'abord pour cette matière).","err");return;}
   const c={
     id:genId(),source:"upload",
     univ:a.univ.id,faculte:a.fac.id,annee:a.niv,matiere:a.mat,
@@ -3679,7 +3753,7 @@ async function saveNewContenu(){
   };
   state.contenus.push(c);
   const r=await dbInsertContenu(c);
-  if(!r.ok&&!r.offline){alert("Sauvegarde DB échouée : "+(r.error||"erreur"));}
+  if(!r.ok&&!r.offline){toast("Sauvegarde échouée : "+(r.error||"erreur"),"err",4500);}
   closeNewContenu();render();
 }
 function renderNewContenu(){
@@ -3725,7 +3799,16 @@ function renderModal(){const r=document.getElementById("modalRoot");if(!state.mo
   r.innerHTML=`<div class="modal-bg" onclick="setModal(false)"><div class="modal fade" onclick="event.stopPropagation()"><div style="display:flex;justify-content:space-between"><span style="color:var(--accent)">✦</span><button style="background:none;border:none;color:var(--muted);cursor:pointer" onclick="setModal(false)">✕</button></div><h3 class="serif" style="font-size:26px;color:var(--ink);margin:12px 0 6px">Débloque tout Studia</h3><p style="font-size:14px;color:var(--sub);margin:0 0 18px;line-height:1.5">Accès illimité aux cours, TD et examens corrigés.</p><button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="startCheckout('semestre')">Pass semestriel — 39€</button><button class="btn btn-ghost" style="width:100%;margin-bottom:14px" onclick="startCheckout('mensuel')">Mensuel — 9€/mois</button>${hasStripe?'<p class="muted" style="text-align:center;margin:0">Paiement sécurisé via Stripe.</p>':`<div style="border-top:1px solid var(--border);padding-top:12px"><button class="btn btn-ink btn-sm" style="width:100%" onclick="subscribe()">Activer l'accès (démo)</button><p class="muted" style="text-align:center;margin-top:8px">Stripe non configuré — bouton démo.</p></div>`}</div></div>`;
 }
 
-window.addEventListener("load",()=>{if(typeof QRCode==="undefined")console.warn("QR lib non chargée");initSupabase();render();if(sb){Promise.all([loadAdmins(),loadCategories()]).then(()=>{loadContenus();loadHiddenMatieres();loadCustomMatieres();restoreSession();setupRealtime();loadPublicStats();});}});
+/* ===== Bandeau cookies (RGPD — cookies essentiels uniquement) ===== */
+function maybeShowCookieBanner(){
+  try{if(localStorage.getItem("studia_cookies_ok"))return;}catch(e){return;}
+  if(document.getElementById("cookieBanner"))return;
+  const d=document.createElement("div");d.id="cookieBanner";d.className="cookie-banner";
+  d.innerHTML=`<p>🍪 Studia utilise uniquement des cookies <b>essentiels</b> au fonctionnement (connexion, préférences). Aucun traçage publicitaire ni revente de données. <a onclick="acceptCookies();nav('mentions')">En savoir plus</a></p><button class="btn btn-ink btn-sm" style="flex-shrink:0" onclick="acceptCookies()">J'ai compris</button>`;
+  document.body.appendChild(d);
+}
+function acceptCookies(){try{localStorage.setItem("studia_cookies_ok","1");}catch(e){}const b=document.getElementById("cookieBanner");if(b)b.remove();}
+window.addEventListener("load",()=>{if(typeof QRCode==="undefined")console.warn("QR lib non chargée");initSupabase();render();maybeShowCookieBanner();if(sb){Promise.all([loadAdmins(),loadCategories()]).then(()=>{loadContenus();loadHiddenMatieres();loadCustomMatieres();restoreSession();setupRealtime();loadPublicStats();});}});
 </script>
 </body>
 </html>
