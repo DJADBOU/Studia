@@ -602,7 +602,9 @@ async function loadNoteFor(contenu_id){
   try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;
     const{data}=await sb.from("notes").select("*").eq("user_id",u.user.id).eq("contenu_id",contenu_id).maybeSingle();
     state.currentNote=data||{contenu_id,texte:""};
-    safeRender();
+    const ta=document.getElementById("noteTexte");
+    if(ta){if(document.activeElement!==ta)ta.value=state.currentNote.texte||"";}
+    else safeRender();
   }catch(e){}
 }
 const _noteTimers={};const _noteSaving={};
@@ -655,11 +657,14 @@ function performSearch(q){
 async function loadPublicStats(){
   if(!sb)return;
   try{
-    const{count:nbContenus}=await sb.from("contenus").select("*",{count:"exact",head:true});
-    const{count:nbUsers}=await sb.from("profiles").select("*",{count:"exact",head:true});
-    const{count:nbSubs}=await sb.from("subscribers").select("*",{count:"exact",head:true}).eq("status","active");
-    state.publicStats={contenus:nbContenus||0,users:nbUsers||0,subscribers:nbSubs||0};
-    render();
+    let stats=null;
+    // Totaux publics via une fonction agrégée (contourne la RLS : on n'expose QUE les compteurs, pas les lignes perso).
+    try{const{data,error}=await sb.rpc("public_stats");if(!error&&data)stats={contenus:+data.contenus||0,users:+data.users||0,subscribers:+data.subscribers||0};}catch(e){}
+    // Fallback (au moins les contenus, en lecture publique) si la fonction n'existe pas encore.
+    if(!stats){const{count}=await sb.from("contenus").select("*",{count:"exact",head:true});const prev=state.publicStats||{};stats={contenus:count||0,users:prev.users||0,subscribers:prev.subscribers||0};}
+    state.publicStats=stats;
+    // Mise à jour EN PLACE des compteurs (pas de rebuild → pas de flash). Le bandeau n'existe que sur la landing.
+    if(state.view==="landing"&&window._lpMounted)updateLandingStats();
   }catch(e){}
 }
 
@@ -903,7 +908,7 @@ async function postComment(contenu_id,texte){
 async function deleteComment(id){
   if(!sb)return;
   if(!await uiConfirm("Ce commentaire sera supprimé.",{title:"Supprimer ce commentaire ?",confirmText:"Supprimer",danger:true}))return;
-  try{const{error}=await sb.from("comments").delete().eq("id",id);if(error){toast(error.message,"err");return;}toast("Commentaire supprimé","ok");state.comments=(state.comments||[]).filter(c=>c.id!==id);render();}catch(e){}
+  try{const{error}=await sb.from("comments").delete().eq("id",id);if(error){toast(error.message,"err");return;}toast("Commentaire supprimé","ok");state.comments=(state.comments||[]).filter(c=>c.id!==id);if(state.view==="detail")refreshComments();else render();}catch(e){}
 }
 async function submitComment(contenu_id){
   const t=document.getElementById("commentTexte");
@@ -911,7 +916,7 @@ async function submitComment(contenu_id){
   const v=t.value.trim();
   if(!v){toast("Écris quelque chose d'abord","warn");return;}
   const r=await postComment(contenu_id,v);
-  if(r.ok){t.value="";state.comments=await loadComments(contenu_id);render();}
+  if(r.ok){t.value="";state.comments=await loadComments(contenu_id);if(state.view==="detail")refreshComments();else render();}
 }
 
 /* ===== Signaler une erreur (feedback par sujet) ===== */
@@ -1634,6 +1639,14 @@ function semSegHTML(currentSem,annee){
 }
 function openMatiere(m){if(m==null||m==="")return;state.matiere=m;const cats=catsFor(state.univ.id,state.faculte.id,state.annee,m);state.tab=(cats[0]||{}).id||null;state.view="matiere";render();}
 function setTab(t){state.tab=t;render();}
+function commentsListHTML(){
+  return (state.comments||[]).length?(state.comments||[]).map(c=>{const cp=c.profile||{};const nom=((cp.prenom||"")+" "+(cp.nom||"")).trim()||"Anonyme";const init=getInitials(cp,{email:""})||"?";const isMine=state.user&&c.user_id&&state.user.email;return `<div class="comment"><div class="comment-avatar">${esc(init)}</div><div class="comment-body"><div class="comment-head"><span class="comment-name">${esc(nom)}</span><span class="comment-time">${fmtRelativeDate(c.created_at)}</span></div><p class="comment-text">${esc(c.texte||"")}</p>${(isMine||(state.user&&state.user.role==="admin"))?`<button onclick="deleteComment(${c.id})" style="background:none;border:none;color:var(--muted);font-size:11.5px;padding:6px 0 0;cursor:pointer">Supprimer</button>`:""}</div></div>`;}).join(""):'<div class="muted" style="padding:24px 0;text-align:center">Aucun commentaire pour l\'instant. Sois le premier à lancer la discussion.</div>';
+}
+// Met à jour les commentaires SANS reconstruire la vue (sinon le PDF/la vidéo se rechargent).
+function refreshComments(){
+  const list=document.getElementById("cList");if(list)list.innerHTML=commentsListHTML();
+  const cnt=document.getElementById("cCount");if(cnt)cnt.textContent="("+((state.comments||[]).length)+")";
+}
 async function openItem(id){
   const c=state.contenus.find(x=>x.id===id);if(!c)return;
   // Verrouillage strict : un étudiant n'ouvre que les contenus de son année/semestre en cours
@@ -1648,7 +1661,7 @@ async function openItem(id){
   const unlocked=c.gratuit||state.subscribed||(state.user&&state.user.role==="admin");
   if(unlocked&&c.file_path&&!c.video_url)preparePDFForView(c,c.file_path);
   // Charge les commentaires (safeRender : n'interrompt pas une saisie de commentaire en cours)
-  if(sb){loadComments(c.id).then(cmts=>{state.comments=cmts;safeRender();});}
+  if(sb){loadComments(c.id).then(cmts=>{state.comments=cmts;if(state.view==="detail")refreshComments();else safeRender();});}
   // Charge la note perso
   if(sb&&state.user)loadNoteFor(c.id);
 }
@@ -1678,6 +1691,18 @@ function setAuthMode(m){state.authMode=m;render();}
 function toggleMenu(){state.menu=!state.menu;render();}
 function loginAdmin(){state.user={email:ADMIN_EMAIL,role:"admin"};state.adminAuthed=true;state.a.view="univ";state.view="admin";state.menu=false;render();}
 function loginStudent(email){state.user={email,role:"student"};state.adminAuthed=false;state.view="univs";state.menu=false;render();}
+function authErrFr(msg){
+  const m=(msg||"").toLowerCase();
+  if(m.includes("invalid login")||m.includes("invalid credential"))return "Email ou mot de passe incorrect.";
+  if(m.includes("already registered")||m.includes("already been registered")||m.includes("user already"))return "Un compte existe déjà avec cet email — connecte-toi plutôt.";
+  if(m.includes("email not confirmed"))return "Confirme d'abord ton email (vérifie ta boîte mail, et les spams).";
+  if(m.includes("password should be")||m.includes("at least 6")||m.includes("password is too"))return "Mot de passe : 6 caractères minimum.";
+  if(m.includes("invalid format")||m.includes("invalid email")||m.includes("unable to validate email"))return "Adresse email invalide.";
+  if(m.includes("rate limit")||m.includes("for security purposes")||m.includes("only request this after"))return "Trop de tentatives. Réessaie dans quelques instants.";
+  if(m.includes("signups not allowed")||m.includes("signup is disabled"))return "Les inscriptions sont momentanément fermées.";
+  if(m.includes("network")||m.includes("failed to fetch")||m.includes("load failed"))return "Connexion impossible. Vérifie ta connexion internet.";
+  return msg||"Une erreur est survenue. Réessaie.";
+}
 async function doAuth(){
   const get=id=>{const el=document.getElementById(id);return el?(el.value||"").trim():"";};
   const email=get("authEmail").toLowerCase();
@@ -1703,7 +1728,7 @@ async function doAuth(){
   if(sb){
     try{
       const {data,error}=await (isSignup?sb.auth.signUp({email,password:pass}):sb.auth.signInWithPassword({email,password:pass}));
-      if(error){if(err)err.textContent=error.message;return;}
+      if(error){if(err)err.textContent=authErrFr(error.message);return;}
       // Si signup → on stocke en localStorage les champs profil, ils seront upserts dès que la session est active
       if(isSignup&&profileData){
         try{localStorage.setItem("studia_pending_profile_"+email,JSON.stringify(profileData));}catch(e){}
@@ -1722,7 +1747,7 @@ async function doAuth(){
       state.view=hasProfile()?"mycourses":"univs";
       if(state.view==="mycourses")loadMyStats().then(s=>{state.myStats=s;render();});
       render();return;
-    }catch(e){if(err)err.textContent=e.message;return;}
+    }catch(e){if(err)err.textContent=authErrFr(e.message);return;}
   }
   loginStudent(email);
 }
@@ -2496,17 +2521,17 @@ function Detail(){
 
     ${unlocked&&state.user?`<div class="notes-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="font-size:14px;color:var(--ink);font-weight:600;margin:0">📝 Mes notes (privées)</h3>${state.bookmarks.has(it.id)?'<span class="pill" style="background:#FFF3D9;color:#9A6A18">★ Favori</span>':""}</div>
-      <textarea placeholder="Note clé, formule à retenir, page intéressante… (auto-sauvegardé)" oninput="updNote('${it.id}',this.value)">${esc((state.currentNote&&state.currentNote.contenu_id===it.id)?state.currentNote.texte:"")}</textarea>
+      <textarea id="noteTexte" placeholder="Note clé, formule à retenir, page intéressante… (auto-sauvegardé)" oninput="updNote('${it.id}',this.value)">${esc((state.currentNote&&state.currentNote.contenu_id===it.id)?state.currentNote.texte:"")}</textarea>
     </div>`:""}
 
     ${unlocked?`<div class="comments">
-      <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 16px">Questions &amp; commentaires <span class="muted" style="font-size:13px">(${(state.comments||[]).length})</span></h2>
+      <h2 class="serif" style="font-size:22px;color:var(--ink);margin:0 0 16px">Questions &amp; commentaires <span class="muted" id="cCount" style="font-size:13px">(${(state.comments||[]).length})</span></h2>
       ${state.user?`<div class="comment-form">
         <div class="comment-avatar">${getInitials(state.profile,state.user)}</div>
         <textarea id="commentTexte" placeholder="Pose ta question sur ce ${isCours?"cours":"sujet"} ou partage une astuce…"></textarea>
         <button class="btn btn-accent btn-sm" onclick="submitComment('${it.id}')">Publier</button>
       </div>`:`<div class="card" style="padding:16px;margin-bottom:14px"><a style="color:var(--accentDark);cursor:pointer;font-weight:500" onclick="nav('login')">Connecte-toi</a> pour poser une question.</div>`}
-      ${(state.comments||[]).length?(state.comments||[]).map(c=>{const cp=c.profile||{};const nom=((cp.prenom||"")+" "+(cp.nom||"")).trim()||"Anonyme";const init=getInitials(cp,{email:""})||"?";const isMine=state.user&&c.user_id&&state.user.email;return `<div class="comment"><div class="comment-avatar">${esc(init)}</div><div class="comment-body"><div class="comment-head"><span class="comment-name">${esc(nom)}</span><span class="comment-time">${fmtRelativeDate(c.created_at)}</span></div><p class="comment-text">${esc(c.texte||"")}</p>${(isMine||(state.user&&state.user.role==="admin"))?`<button onclick="deleteComment(${c.id})" style="background:none;border:none;color:var(--muted);font-size:11.5px;padding:6px 0 0;cursor:pointer">Supprimer</button>`:""}</div></div>`;}).join(""):'<div class="muted" style="padding:24px 0;text-align:center">Aucun commentaire pour l\'instant. Sois le premier à lancer la discussion.</div>'}
+      <div id="cList">${commentsListHTML()}</div>
     </div>`:""}
   </div>`;
 }
@@ -2806,6 +2831,11 @@ function ProfileView(){
         <button class="btn btn-ghost btn-sm" onclick="changePassword()">Changer mon mot de passe</button>
         <button class="btn btn-ghost btn-sm" style="color:#B4453A" onclick="logout()">Déconnexion</button>
       </div>
+      <div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:9px">Zone sensible</div>
+        <button class="btn btn-sm" style="background:transparent;border:1px solid #E4B9B4;color:#B4453A" onclick="deleteAccount()">Supprimer mon compte</button>
+        <p class="muted" style="font-size:11px;line-height:1.5;margin:9px 0 0">Conformément au RGPD : efface définitivement ton profil et toutes tes données. Action irréversible.</p>
+      </div>
     </div>
   </div>`;
 }
@@ -2835,7 +2865,25 @@ async function changePassword(){
   const newPass=await uiPrompt("Choisis un nouveau mot de passe (6 caractères minimum).",{title:"Changer de mot de passe",placeholder:"Nouveau mot de passe",confirmText:"Mettre à jour"});
   if(!newPass||newPass.length<6){toast("Mot de passe trop court (6 caractères min.)","err");return;}
   if(!sb){toast("Pas de connexion.","err");return;}
-  try{const{error}=await sb.auth.updateUser({password:newPass});if(error){toast(error.message,"err");return;}toast("✓ Mot de passe changé","ok");}catch(e){toast("Erreur","err");}
+  try{const{error}=await sb.auth.updateUser({password:newPass});if(error){toast(authErrFr(error.message),"err");return;}toast("✓ Mot de passe changé","ok");}catch(e){toast("Erreur","err");}
+}
+async function deleteAccount(){
+  if(!sb||!state.user)return;
+  const ok=await uiConfirm("Ton profil et toutes tes données personnelles (notes, favoris, CV, relevé de notes) seront définitivement supprimés, et tu seras déconnecté. C'est irréversible.",{title:"Supprimer mon compte ?",confirmText:"Oui, supprimer mon compte",danger:true});
+  if(!ok)return;
+  try{
+    const{data:u}=await sb.auth.getUser();
+    const uid=u&&u.user&&u.user.id;
+    if(uid){
+      try{const ps=[(state.profile||{}).cv_path,(state.profile||{}).releve_path].filter(Boolean);if(ps.length)await sb.storage.from("documents").remove(ps);}catch(e){}
+      try{await sb.from("notes").delete().eq("user_id",uid);}catch(e){}
+      try{await sb.from("bookmarks").delete().eq("user_id",uid);}catch(e){}
+      try{await sb.from("profiles").delete().eq("user_id",uid);}catch(e){}
+    }
+    toast("Ton compte et tes données ont été supprimés. À bientôt 👋","ok",5000);
+  }catch(e){toast("Erreur : "+(e.message||"suppression impossible"),"err",5000);}
+  try{await sb.auth.signOut();}catch(e){}
+  logout();
 }
 
 /* ===== Pages info / légal ===== */
@@ -2934,6 +2982,15 @@ function captureSignup(){
   const g=id=>{const e=document.getElementById(id);return e?e.value:undefined;};
   state._signupForm={...(state._signupForm||{}),prenom:g("authPrenom"),nom:g("authNom"),phone:g("authPhone"),birthdate:g("authBirth"),genre:g("authGenre"),ville:g("authVille"),adresse:g("authAdresse"),email:g("authEmail"),pass:g("authPass"),faculte:g("authFaculte"),annee:g("authAnnee"),semestre:g("authSemestre"),linkedin:g("authLinkedin")};
 }
+function togglePass(id,btn){const el=document.getElementById(id);if(!el)return;const show=el.type==="password";el.type=show?"text":"password";btn.textContent=show?"🙈":"👁";btn.setAttribute("aria-label",show?"Masquer le mot de passe":"Afficher le mot de passe");}
+function pwMeter(v){
+  const bar=document.getElementById("pwMeterBar"),lbl=document.getElementById("pwMeterLabel");if(!bar)return;
+  if(!v){bar.style.width="0";if(lbl)lbl.textContent="";return;}
+  let s=0;if(v.length>=6)s++;if(v.length>=10)s++;if(/[a-z]/.test(v)&&/[A-Z]/.test(v))s++;if(/\d/.test(v))s++;if(/[^A-Za-z0-9]/.test(v))s++;
+  const lvl=s<=1?0:s<=3?1:2,colors=["#B4453A","#9A6A18","#2A9D47"],labels=["Faible","Moyen","Solide"];
+  bar.style.width=Math.min(100,Math.max(18,s*22))+"%";bar.style.background=colors[lvl];
+  if(lbl){lbl.textContent="Sécurité : "+labels[lvl];lbl.style.color=colors[lvl];}
+}
 function LoginView(){
   const signup=state.authMode==="signup";
   const univSelected=state._signupUniv||"uca";
@@ -2960,7 +3017,7 @@ function LoginView(){
 
       <div style="${SL}">Connexion &amp; contact</div>
       <div style="margin-bottom:8px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username" value="${esc(sf.email||'')}"/></div>
-      <div style="margin-bottom:8px"><input class="input" id="authPass" type="password" placeholder="Mot de passe (6+ caractères)" autocomplete="new-password" value="${esc(sf.pass||'')}"/></div>
+      <div style="margin-bottom:8px"><div style="position:relative"><input class="input" id="authPass" type="password" placeholder="Mot de passe (6+ caractères)" autocomplete="new-password" value="${esc(sf.pass||'')}" oninput="pwMeter(this.value)" style="padding-right:42px"/><button type="button" onclick="togglePass('authPass',this)" aria-label="Afficher le mot de passe" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:4px;line-height:1">👁</button></div><div style="height:4px;border-radius:3px;background:var(--border);margin:7px 2px 0;overflow:hidden"><div id="pwMeterBar" style="height:100%;width:0;background:var(--accent);transition:width .25s,background .25s"></div></div><div id="pwMeterLabel" class="muted" style="font-size:11px;margin:4px 2px 0"></div></div>
       <div style="margin-bottom:8px"><input class="input" id="authPhone" type="tel" placeholder="Numéro de téléphone (+33…)" value="${esc(sf.phone||'')}"/></div>
 
       <div style="${SL}">Adresse</div>
@@ -2983,7 +3040,7 @@ function LoginView(){
       <p class="muted" style="font-size:11px;line-height:1.45;margin:2px 0 0">📎 Ton <b>CV</b> et ton <b>relevé de notes</b> se déposent depuis ton profil, juste après la création du compte.</p>
     `:`
       <div style="margin-bottom:12px"><input class="input" id="authEmail" placeholder="Email" autocomplete="username"/></div>
-      <div style="margin-bottom:12px"><input class="input" id="authPass" type="password" placeholder="Mot de passe" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()"/></div>
+      <div style="margin-bottom:12px"><div style="position:relative"><input class="input" id="authPass" type="password" placeholder="Mot de passe" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()" style="padding-right:42px"/><button type="button" onclick="togglePass('authPass',this)" aria-label="Afficher le mot de passe" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:4px;line-height:1">👁</button></div></div>
     `}
     <button class="btn btn-ink" style="width:100%;margin-top:18px" onclick="doAuth()">${signup?"Créer mon compte":"Se connecter"}</button>
     ${!signup?'<div style="text-align:right;margin-top:6px"><a onclick="resetPassword()" style="font-size:12.5px;color:var(--accentDark);cursor:pointer">Mot de passe oublié ?</a></div>':""}
@@ -3808,7 +3865,7 @@ function maybeShowCookieBanner(){
   document.body.appendChild(d);
 }
 function acceptCookies(){try{localStorage.setItem("studia_cookies_ok","1");}catch(e){}const b=document.getElementById("cookieBanner");if(b)b.remove();}
-window.addEventListener("load",()=>{if(typeof QRCode==="undefined")console.warn("QR lib non chargée");initSupabase();render();maybeShowCookieBanner();if(sb){Promise.all([loadAdmins(),loadCategories()]).then(()=>{loadContenus();loadHiddenMatieres();loadCustomMatieres();restoreSession();setupRealtime();loadPublicStats();});}});
+window.addEventListener("load",()=>{if(typeof QRCode==="undefined")console.warn("QR lib non chargée");initSupabase();render();maybeShowCookieBanner();if(sb){Promise.all([loadAdmins(),loadCategories()]).then(()=>{loadContenus();loadHiddenMatieres();loadCustomMatieres();restoreSession();setupRealtime();loadPublicStats();setInterval(loadPublicStats,45000);});}});
 </script>
 </body>
 </html>
