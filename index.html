@@ -227,6 +227,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .testimonial-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#34C759,#1E8C3C);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0}
 .testimonial-name{font-weight:600;color:var(--ink);font-size:13.5px;line-height:1.2}
 .testimonial-meta{color:var(--sub);font-size:12px;margin-top:2px}
+/* Bandeau écoles défilant (réutilise l'animation .marquee) */
+.school-chip{flex-shrink:0;display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:11px 18px}
+.school-chip .ulogo{width:34px;height:34px}
+.school-chip .sc-nom{font-weight:600;color:var(--ink);font-size:14px;white-space:nowrap;line-height:1.15}
+.school-chip .sc-ville{color:var(--sub);font-size:12px;white-space:nowrap;margin-top:1px}
+.school-chip .sc-live{font-size:10.5px;font-weight:600;color:var(--accentDark);background:var(--accentSoft);border-radius:999px;padding:3px 8px;white-space:nowrap}
 
 /* Founders */
 .founders-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:22px}
@@ -443,7 +449,7 @@ body.hide-content .hidden-on-blur::after{content:"⛔ Capture détectée — l'�
 const ACCOUNT="admin", ADMIN_EMAIL="djad@studia.app";
 // Liste d'emails admin chargée depuis la table "admins" au démarrage.
 // On garde djad en fallback pour ne pas perdre l'accès si le fetch échoue.
-let ADMIN_EMAILS=new Set([ADMIN_EMAIL]);
+let ADMIN_EMAILS=new Set([ADMIN_EMAIL,"ellis@studia.app"]);
 function isAdminEmail(email){return email&&ADMIN_EMAILS.has(email);}
 function isAdminUser(){return state.user&&isAdminEmail(state.user.email);}
 const CONFIG={
@@ -561,7 +567,7 @@ function setupRealtime(){
   }catch(e){console.warn("Realtime:",e.message);}
 }
 async function checkSubscription(){if(!sb||!state.user)return;try{const{data:u}=await sb.auth.getUser();if(!u||!u.user)return;const{data}=await sb.from("subscribers").select("status").eq("user_id",u.user.id).maybeSingle();if(data&&data.status==="active"){state.subscribed=true;render();}}catch(e){}}
-async function loadAdmins(){if(!sb)return;try{const{data,error}=await sb.from("admins").select("email");if(!error&&data){ADMIN_EMAILS=new Set([ADMIN_EMAIL,...data.map(r=>r.email)]);}}catch(e){}}
+async function loadAdmins(){if(!sb)return;try{const{data,error}=await sb.from("admins").select("email");if(!error&&data){ADMIN_EMAILS=new Set([ADMIN_EMAIL,"ellis@studia.app",...data.map(r=>r.email)]);}}catch(e){}}
 /* ===== Reset password ===== */
 async function resetPassword(){
   const email=await uiPrompt("Entre ton adresse email, on t'envoie un lien de réinitialisation.",{title:"Mot de passe oublié",placeholder:"ton@email.fr",confirmText:"Envoyer le lien"});
@@ -1314,16 +1320,9 @@ const UNIVS=[
  {id:"skema",nom:"SKEMA Business School",ville:"Sophia Antipolis",type:"esc",actif:false,facultes:[]},
  {id:"audencia",nom:"Audencia",ville:"Nantes",type:"esc",actif:false,facultes:[]},
 ];
-const TESTIMONIALS=[
-  ["Avant Studia, je décrochais en micro. Avec les vidéos de Léa, j'ai eu 14 au partiel. Mille fois plus clair que mon prof.","Antoine M.","L2 Éco · Nice"],
-  ["Les TD corrigés en vidéo c'est game changer. Tu vois la méthode, pas juste la réponse.","Marie L.","L1 Droit · Nice"],
-  ["Passé du redoublement potentiel à 14 de moyenne en un semestre. Studia m'a sauvé la licence.","Yanis B.","L1 Éco · Nice"],
-  ["Le pass semestriel à 39€ c'est ce qui m'a permis de m'accrocher. Plus rentable qu'une prépa privée.","Camille R.","L2 Droit · Nice"],
-  ["Les tuteurs ont eu la note avant moi : ils savent exactement où on bloque.","Théo P.","L3 Maths · Nice"],
-  ["J'avais 8 en stat, là j'ai 15. Les pièges signalés en vidéo, incroyables.","Sofia D.","L2 Éco · Nice"],
-  ["Ils expliquent comme un pote, pas comme un cours magistral. Ça change tout.","Maxence T.","L1 Éco · Nice"],
-  ["J'ai validé ma L1 grâce à Studia. Honnêtement les profs devraient s'en inspirer.","Lou K.","L2 Droit · Nice"]
-];
+// Aucun faux témoignage (contrainte d'honnêteté Studia : pas de faux avis / tuteurs / stats).
+// Réactiver UNIQUEMENT avec de vrais avis vérifiés, après le lancement.
+const TESTIMONIALS=[];
 const FOUNDERS=[
   {initiales:"DB",nom:"Djad Boulanouar",role:"Co-fondateur",photo:"djad.jpg",linkedin:"https://www.linkedin.com/in/djad-boulanouar-921546206/",
    bio:"Étudiant à l'Université Côte d'Azur, passionné par l'éducation et la tech. J'ai créé Studia avec Ellis pour que chaque étudiant ait accès aux explications des meilleurs de sa promo — la méthode, les pièges, ce que le correcteur attend vraiment.",
@@ -1820,7 +1819,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&state.pdfFullscreen
 /* ===== Landing ===== */
 function Landing(skipAnim){
   const s=computeStats();
-  const dup=TESTIMONIALS.concat(TESTIMONIALS); // doublé pour boucle infinie
+  // Bandeau défilant des universités & écoles (vraies écoles ; UCA déjà en ligne, les autres en déploiement)
+  const schoolChips=UNIVS.map(u=>`<div class="school-chip">${univLogoHTML(u)}<div><div class="sc-nom">${esc(u.nom)}</div><div class="sc-ville">${esc(u.ville)}</div></div>${u.actif?'<span class="sc-live">✓ En ligne</span>':''}</div>`).join("");
   const nUsers=(state.publicStats&&state.publicStats.users)||0;
   const nContenus=(state.publicStats&&state.publicStats.contenus)||(s.cours+s.td+s.examens);
   const nSubs=(state.publicStats&&state.publicStats.subscribers)||0;
@@ -1856,8 +1856,8 @@ function Landing(skipAnim){
   ];
   const plans=[
     {nom:"Découverte",amt:"0",per:"",sub:"Pour tester sans payer",feats:["2 contenus offerts","Aperçu des méthodes","Accès au programme"],cta:"Commencer gratuitement",v:"ghost",act:"nav('univs')"},
-    {nom:"Pass semestriel",amt:"39",per:"€",sub:"pour tout le semestre",save:"−15 € vs mensuel",reco:true,feats:["Accès illimité tout le semestre","Cours, TD & examens corrigés","Partiels blancs & QCM","Lives de révision avant partiels"],cta:"Choisir le semestre →",v:"ink",act:"startCheckout('semestre')"},
-    {nom:"Mensuel",amt:"9",per:"€",sub:"par mois · sans engagement",feats:["Accès illimité","Tous les contenus corrigés","Partiels blancs & QCM","Résiliable en 1 clic"],cta:"Prendre au mois",v:"ghost",act:"startCheckout('mensuel')"}
+    {nom:"Pass semestriel",amt:"39",per:"€",sub:"pour tout le semestre",save:"−15 € vs mensuel",reco:true,feats:["Accès illimité tout le semestre","Cours, TD & examens corrigés","Partiels blancs & QCM (bientôt)","Lives de révision (bientôt)"],cta:"Choisir le semestre →",v:"ink",act:"startCheckout('semestre')"},
+    {nom:"Mensuel",amt:"9",per:"€",sub:"par mois · sans engagement",feats:["Accès illimité","Tous les contenus corrigés","Partiels blancs & QCM (bientôt)","Résiliable en 1 clic"],cta:"Prendre au mois",v:"ghost",act:"startCheckout('mensuel')"}
   ];
   return `<div class="fade${skipAnim?' lp-norestart':''}"><div id="lp-progress"></div>${Nav()}
   <section class="lp-hero">
@@ -1986,13 +1986,12 @@ function Landing(skipAnim){
   </div>
 
   <div class="wrap"><section class="sec reveal" style="border:none;padding-bottom:16px;text-align:center">
-    <span class="eyebrow">Ils ont décroché grâce à Studia</span>
-    <h2 class="sec-title">Ce qu'en disent les étudiants.</h2>
+    <span class="eyebrow">Universités &amp; écoles</span>
+    <h2 class="sec-title">On arrive, campus par campus.</h2>
+    <p style="font-size:15px;color:var(--sub);max-width:520px;margin:8px auto 0;line-height:1.5">Studia se déploie progressivement. Premier campus déjà en ligne : l'Université Côte d'Azur.</p>
   </section></div>
   <div class="marquee reveal" style="margin-bottom:30px">
-    <div class="marquee-track">
-      ${dup.map(([q,n,m])=>`<div class="testimonial"><div class="testimonial-stars">★★★★★</div><p class="testimonial-quote">« ${q} »</p><div class="testimonial-author"><div class="testimonial-avatar">${n.split(" ").map(x=>x[0]).join("")}</div><div><div class="testimonial-name">${n}</div><div class="testimonial-meta">${m}</div></div></div></div>`).join("")}
-    </div>
+    <div class="marquee-track">${schoolChips}${schoolChips}</div>
   </div>
 
   <div class="wrap">
@@ -2539,7 +2538,7 @@ function Detail(){
 function Tarifs(){
   const plans=[
     {nom:"Découverte",prix:"0",per:"",badge:"Gratuit",desc:"Pour découvrir Studia avant de t'abonner.",feats:["2 contenus gratuits","Aperçu des méthodes","Accès au programme complet"],cta:"Commencer gratuitement",v:"ghost",plan:"free"},
-    {nom:"Pass semestriel",prix:"39",per:"€",sub:"pour tout le semestre",badge:"Le + populaire",desc:"Calé sur le rythme des partiels : couvert pour décembre ET pour mai.",feats:["Accès illimité tout le semestre","Cours, TD & examens corrigés","QCM & partiels blancs","Lives de révision avant partiels","Économie de 15 € vs. mensuel"],cta:"Choisir le semestre",v:"accent",plan:"semestre",reco:true},
+    {nom:"Pass semestriel",prix:"39",per:"€",sub:"pour tout le semestre",badge:"Le + populaire",desc:"Calé sur le rythme des partiels : couvert pour décembre ET pour mai.",feats:["Accès illimité tout le semestre","Cours, TD & examens corrigés","QCM & partiels blancs (bientôt)","Lives de révision avant partiels (bientôt)","Économie de 15 € vs. mensuel"],cta:"Choisir le semestre",v:"accent",plan:"semestre",reco:true},
     {nom:"Mensuel",prix:"9",per:"€",sub:"par mois",badge:"Flexible",desc:"Sans engagement, résiliable à tout moment.",feats:["Accès illimité","Tous les contenus corrigés","QCM & partiels blancs","Résiliable en 1 clic"],cta:"Prendre au mois",v:"ghost",plan:"mensuel"}
   ];
   return `<div class="wrap fade" style="padding:54px 0 0">
@@ -2871,17 +2870,26 @@ async function deleteAccount(){
   if(!sb||!state.user)return;
   const ok=await uiConfirm("Ton profil et toutes tes données personnelles (notes, favoris, CV, relevé de notes) seront définitivement supprimés, et tu seras déconnecté. C'est irréversible.",{title:"Supprimer mon compte ?",confirmText:"Oui, supprimer mon compte",danger:true});
   if(!ok)return;
+  let hardDeleted=false;
   try{
-    const{data:u}=await sb.auth.getUser();
-    const uid=u&&u.user&&u.user.id;
-    if(uid){
-      try{const ps=[(state.profile||{}).cv_path,(state.profile||{}).releve_path].filter(Boolean);if(ps.length)await sb.storage.from("documents").remove(ps);}catch(e){}
-      try{await sb.from("notes").delete().eq("user_id",uid);}catch(e){}
-      try{await sb.from("bookmarks").delete().eq("user_id",uid);}catch(e){}
-      try{await sb.from("profiles").delete().eq("user_id",uid);}catch(e){}
-    }
-    toast("Ton compte et tes données ont été supprimés. À bientôt 👋","ok",5000);
-  }catch(e){toast("Erreur : "+(e.message||"suppression impossible"),"err",5000);}
+    // Suppression définitive complète (RGPD) via l'edge function service_role → efface aussi auth.users (cascade)
+    const{data,error}=await sb.functions.invoke("delete-account",{method:"POST"});
+    if(!error&&data&&data.deleted)hardDeleted=true;
+  }catch(e){}
+  if(!hardDeleted){
+    // Repli si l'edge function n'est pas (encore) déployée : suppression côté client (nécessite la policy profiles_self_delete)
+    try{
+      const{data:u}=await sb.auth.getUser();
+      const uid=u&&u.user&&u.user.id;
+      if(uid){
+        try{const ps=[(state.profile||{}).cv_path,(state.profile||{}).releve_path].filter(Boolean);if(ps.length)await sb.storage.from("documents").remove(ps);}catch(e){}
+        try{await sb.from("notes").delete().eq("user_id",uid);}catch(e){}
+        try{await sb.from("bookmarks").delete().eq("user_id",uid);}catch(e){}
+        try{await sb.from("profiles").delete().eq("user_id",uid);}catch(e){}
+      }
+    }catch(e){}
+  }
+  toast("Ton compte et tes données ont été supprimés. À bientôt 👋","ok",5000);
   try{await sb.auth.signOut();}catch(e){}
   logout();
 }
@@ -2892,7 +2900,7 @@ function AboutView(){
     <span class="eyebrow">Qui sommes-nous</span>
     <h1>Deux étudiants, une conviction.</h1>
     <p>Studia est née d'un constat simple, vécu sur les bancs de l'Université Côte d'Azur : trop de bons étudiants décrochent, non par manque de travail, mais parce que personne ne leur a montré <i>comment</i> aborder un sujet. Les meilleurs ont une méthode — et cette méthode peut se transmettre.</p>
-    <p>Avec Ellis, nous avons décidé de construire la plateforme qu'on aurait voulu avoir en L1 : des cours, TD et examens corrigés en vidéo par les étudiants qui ont eu les meilleures notes, expliqués avec la langue des étudiants, sans jargon professoral.</p>
+    <p>Avec Ellis, nous avons décidé de construire la plateforme qu'on aurait voulu avoir en L1 : des cours, TD et examens corrigés et expliqués pas à pas par les étudiants qui ont eu les meilleures notes, avec la langue des étudiants, sans jargon professoral — et bientôt aussi en vidéo.</p>
     <h2>Notre principe</h2>
     <p>Chaque tuteur a obtenu au moins 16/20 dans la matière qu'il enseigne. Chaque contenu est 100% original — jamais un support de prof. Chaque téléchargement est tatoué au nom de l'abonné pour protéger le travail des tuteurs.</p>
     <h2>Notre équipe</h2>
@@ -2923,7 +2931,7 @@ function MentionsView(){
     <h2>Hébergement</h2>
     <p>Le site est hébergé sur un service de déploiement statique (Netlify / Vercel / Cloudflare Pages, à préciser). La base de données et le stockage des fichiers sont gérés par Supabase (Supabase Inc.).</p>
     <h2>Propriété intellectuelle</h2>
-    <p>L'ensemble des contenus pédagogiques (textes, vidéos, corrigés, schémas) sont des œuvres originales protégées par le droit d'auteur. Toute reproduction non autorisée est interdite. Voir la page <a onclick="nav('droits')" style="color:var(--accentDark);cursor:pointer">Droits d'auteur</a>.</p>
+    <p>L'ensemble des contenus pédagogiques (cours, TD, corrigés, schémas, et bientôt vidéos) sont des œuvres originales protégées par le droit d'auteur. Toute reproduction non autorisée est interdite. Voir la page <a onclick="nav('droits')" style="color:var(--accentDark);cursor:pointer">Droits d'auteur</a>.</p>
     <h2>Données personnelles</h2>
     <p>Les données collectées (email, identifiants Supabase Auth) servent uniquement à fournir le service. Aucune revente. Conformément au RGPD, tu peux demander l'accès, la rectification ou la suppression de tes données en écrivant à studia.contact@gmail.com.</p>
   </div></div>`;
@@ -2968,9 +2976,9 @@ function DroitsView(){
     <h1>Droits d'auteur &amp; propriété intellectuelle</h1>
     <div class="note" style="margin:18px 0 24px">⚠️ <div><b>Chaque contenu publié sur Studia est une œuvre originale</b> produite par un tuteur étudiant, sous sa responsabilité et soumise à validation par notre équipe.</div></div>
     <h2>Origine des contenus</h2>
-    <p>Aucun support de cours d'un enseignant, aucune correction officielle, aucun document non libre n'est diffusé sur Studia. Tous les cours, TD corrigés, examens corrigés et explications vidéo sont rédigés et filmés par des étudiants tuteurs qui ont eux-mêmes excellé dans la matière.</p>
+    <p>Aucun support de cours d'un enseignant, aucune correction officielle, aucun document non libre n'est diffusé sur Studia. Tous les cours, TD corrigés et examens corrigés sont rédigés par des étudiants tuteurs qui ont eux-mêmes excellé dans la matière (les explications en vidéo arriveront bientôt).</p>
     <h2>Tatouage anti-fuite</h2>
-    <p>À chaque téléchargement, un QR code unique est apposé sur le document, lié à l'identifiant de l'abonné. Toute redistribution permet d'identifier la source. Cette protection s'applique aussi aux captures d'écran de vidéos.</p>
+    <p>À chaque téléchargement, un QR code unique est apposé sur le document, lié à l'identifiant de l'abonné. Toute redistribution permet d'identifier la source. Cette protection s'appliquera également aux vidéos à venir.</p>
     <h2>Reproduction</h2>
     <p>Toute reproduction, copie, redistribution, vente ou exploitation commerciale des contenus Studia, sans autorisation écrite préalable, constitue une contrefaçon punie par les articles L335-2 et suivants du Code de la propriété intellectuelle.</p>
     <h2>Signalement</h2>
@@ -3083,7 +3091,7 @@ function Footer(){
         <a onclick="nav('droits')">Droits d'auteur</a>
       </div>
     </div>
-    <p class="footer-disclaimer">⚠️ <b>Avertissement droits d'auteur.</b> Tous les contenus publiés sur Studia (cours, corrigés, vidéos) sont des œuvres originales produites par nos tuteurs. Aucun support de cours d'enseignant n'est diffusé. Toute reproduction, copie ou redistribution non autorisée est interdite et fait l'objet de poursuites — chaque téléchargement est tatoué au nom de l'abonné via QR code traçable.</p>
+    <p class="footer-disclaimer">⚠️ <b>Avertissement droits d'auteur.</b> Tous les contenus publiés sur Studia (cours, TD, corrigés, et bientôt vidéos) sont des œuvres originales produites par nos tuteurs. Aucun support de cours d'enseignant n'est diffusé. Toute reproduction, copie ou redistribution non autorisée est interdite et fait l'objet de poursuites — chaque téléchargement est tatoué au nom de l'abonné via QR code traçable.</p>
     <div class="footer-bottom">
       <div>© ${year} Studia. Tous droits réservés.</div>
       <div>Fait avec ❤️ à Nice par Djad &amp; Ellis.</div>
