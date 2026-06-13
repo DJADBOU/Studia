@@ -1817,6 +1817,26 @@ function render(){
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&state.pdfFullscreen)closeFullscreenPDF();});
 
 /* ===== Landing ===== */
+/* Sélecteur campus (univ / écoles) de la landing — maj EN PLACE pour ne pas reconstruire
+   toute la landing (sinon le garde anti-flicker de render() ignore le changement d'onglet). */
+function campusSegHTML(){
+  const nU=UNIVS.filter(u=>u.type!=="esc").length, nE=UNIVS.filter(u=>u.type==="esc").length;
+  return `<button class="${(state.univsTab||'univs')==='univs'?'on':''}" onclick="pickCampusTab('univs')">🎓 Universités (${nU})</button>
+        <button class="${state.univsTab==='esc'?'on':''}" onclick="pickCampusTab('esc')">💼 Écoles de commerce (${nE})</button>`;
+}
+function campusGridHTML(){
+  return UNIVS.filter(u=>(state.univsTab||"univs")==="esc"?u.type==="esc":u.type!=="esc").map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.6"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
+          <div class="photo" style="aspect-ratio:16/10"><img loading="lazy" src="${SITE_IMG[u.id]}" onerror="this.remove()"/></div>
+          <div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="display:flex;align-items:center;gap:10px;min-width:0">${univLogoHTML(u)}<div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.2">${u.nom}</div></div>${u.actif?'<span class="pill">Live</span>':'<span class="tag">Bientôt</span>'}</div><div class="muted" style="margin-top:8px">${u.ville}${u.actif?` · ${u.facultes.length} filières`:""}</div></div>
+        </div>`).join("");
+}
+function pickCampusTab(tab){
+  state.univsTab=tab;
+  const seg=document.getElementById('campusSeg'), grid=document.getElementById('campusGrid');
+  if(seg&&grid){seg.innerHTML=campusSegHTML();grid.innerHTML=campusGridHTML();}
+  else render();
+}
+
 function Landing(skipAnim){
   const s=computeStats();
   // Bandeau défilant des universités & écoles (vraies écoles ; UCA déjà en ligne, les autres en déploiement)
@@ -1933,16 +1953,8 @@ function Landing(skipAnim){
       <span class="eyebrow">Les campus sur Studia</span>
       <h2 class="sec-title">On s'étend campus par campus.</h2>
       <p class="sec-lead">Chaque école dispose de ses propres tuteurs majors. On vérifie la qualité avant publication.</p>
-      <div class="seg" style="margin-bottom:24px">
-        <button class="${(state.univsTab||'univs')==='univs'?'on':''}" onclick="state.univsTab='univs';render()">🎓 Universités (${UNIVS.filter(u=>u.type!=="esc").length})</button>
-        <button class="${state.univsTab==='esc'?'on':''}" onclick="state.univsTab='esc';render()">💼 Écoles de commerce (${UNIVS.filter(u=>u.type==="esc").length})</button>
-      </div>
-      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">
-        ${UNIVS.filter(u=>(state.univsTab||"univs")==="esc"?u.type==="esc":u.type!=="esc").map((u,i)=>`<div class="card ${u.actif?"card-h":""}" style="overflow:hidden;${u.actif?"":"opacity:.6"}" ${u.actif?`onclick="selectUniv('${u.id}')"`:""}>
-          <div class="photo" style="aspect-ratio:16/10"><img loading="lazy" src="${SITE_IMG[u.id]}" onerror="this.remove()"/></div>
-          <div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="display:flex;align-items:center;gap:10px;min-width:0">${univLogoHTML(u)}<div style="font-weight:600;color:var(--ink);font-size:15px;line-height:1.2">${u.nom}</div></div>${u.actif?'<span class="pill">Live</span>':'<span class="tag">Bientôt</span>'}</div><div class="muted" style="margin-top:8px">${u.ville}${u.actif?` · ${u.facultes.length} filières`:""}</div></div>
-        </div>`).join("")}
-      </div>
+      <div class="seg" id="campusSeg" style="margin-bottom:24px">${campusSegHTML()}</div>
+      <div class="grid" id="campusGrid" style="grid-template-columns:repeat(auto-fit,minmax(230px,1fr))">${campusGridHTML()}</div>
     </section>
 
     <section class="sec reveal">
